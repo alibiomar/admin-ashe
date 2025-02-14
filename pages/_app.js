@@ -9,44 +9,31 @@ function MyApp({ Component, pageProps }) {
   const [showPermission, setShowPermission] = useState(false);
   const [swRegistration, setSwRegistration] = useState(null);
 
-// Register the service worker and handle updates
-useEffect(() => {
-  if ("serviceWorker" in navigator) {
-    const registerSW = async () => {
-      try {
-        const registration = await navigator.serviceWorker.register("/sw.js");
-        console.log("Service Worker Registered");
-        setSwRegistration(registration);
-
-        // Ensure the service worker is active before sending messages
-        if (registration.active) {
-          console.log("Service Worker is active");
-        } else {
-          registration.addEventListener("statechange", () => {
-            if (registration.active) {
-              console.log("Service Worker is now active");
-              setSwRegistration(registration);
-            }
+  useEffect(() => {
+    if ("serviceWorker" in navigator) {
+      const registerSW = async () => {
+        try {
+          const registration = await navigator.serviceWorker.register("/sw.js");
+          console.log("Service Worker Registered:", registration);
+  
+          registration.addEventListener("updatefound", () => {
+            const newWorker = registration.installing;
+            newWorker.addEventListener("statechange", () => {
+              if (newWorker.state === "activated") {
+                console.log("Service Worker activated");
+                setSwRegistration(registration); // Store the registration when it's active
+              }
+            });
           });
+        } catch (err) {
+          console.error("Service Worker Registration Failed:", err);
         }
-
-        // Handle service worker updates
-        registration.addEventListener("updatefound", () => {
-          const newWorker = registration.installing;
-          newWorker.addEventListener("statechange", () => {
-            if (newWorker.state === "activated") {
-              console.log("Service Worker updated and activated");
-            }
-          });
-        });
-      } catch (err) {
-        console.error("Service Worker Registration Failed:", err);
-      }
-    };
-
-    registerSW();
-  }
-}, []);
+      };
+  
+      registerSW();
+    }
+  }, []);
+  
 
 
   // Delay showing the notification permission request until user interaction
