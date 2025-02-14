@@ -2,7 +2,7 @@ const withPWA = require("next-pwa");
 
 const nextConfig = {
   devIndicators: {
-    buildActivity: false,
+    buildActivity: false, // Keep this in the main Next.js config
   },
   images: {
     remotePatterns: [
@@ -20,25 +20,21 @@ const nextConfig = {
       },
       {
         protocol: 'https',
-        hostname: 'firebasestorage.googleapis.com', // Add Firebase Storage
+        hostname: 'firebasestorage.googleapis.com', // Firebase Storage
       },
       {
         protocol: 'https',
         hostname: 'lh3.googleusercontent.com', // Google user content
-      }
+      },
     ],
   },
-  // Additional security enhancements
   poweredByHeader: false,
   reactStrictMode: true,
   productionBrowserSourceMaps: false,
 };
 
 module.exports = withPWA({
-  ...nextConfig,
-  pwa: {
-    dest: "public",
-    register: true,
-    skipWaiting: true,
-  },
-});
+  dest: "public", // PWA specific options
+  register: true,
+  skipWaiting: true,
+})(nextConfig);
