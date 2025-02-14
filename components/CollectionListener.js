@@ -7,7 +7,6 @@ export default function CollectionListener({ swRegistration }) {
     if (!swRegistration) return;
 
     const setupNotifications = async () => {
-      // Only proceed if notification permission is granted
       if (Notification.permission !== 'granted') return;
 
       const q = query(collection(db, "orders"));
@@ -28,8 +27,7 @@ export default function CollectionListener({ swRegistration }) {
                   tag: `order-${change.doc.id}`,
                   data: {
                     orderId: change.doc.id,
-                    timestamp: new Date().toISOString(),
-                    url: `/admin/orders/` // URL to navigate to when clicked
+                    timestamp: new Date().toISOString()
                   }
                 },
               });

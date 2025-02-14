@@ -25,7 +25,7 @@
   "shortcuts": [],
   "categories": ["business", "productivity"],
   "orientation": "any",
-  "display_override": ["standalone", "browser"],
+  "display_override": ["standalone", "fullscreen", "minimal-ui"],
   "gcm_sender_id": "797645105159",
   "notification": {
     "actions": [
