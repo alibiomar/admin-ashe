@@ -62,20 +62,19 @@ self.addEventListener('notificationclick', (event) => {
   );
 });
 
-// Handle messages from the client
-self.addEventListener('message', (event) => {
-  if (event.data.type === 'TRIGGER_NOTIFICATION') {
+// Handle messages from the client (web app)
+self.addEventListener("message", (event) => {
+  if (event.data.type === "TRIGGER_NOTIFICATION") {
     const { title, options } = event.data;
-    
+
+    // Ensure notifications are shown correctly
     self.registration.showNotification(title, {
       ...options,
-      requireInteraction: true,
-      silent: false,
-      renotify: true,
-      // Make notifications work better on iOS
-      badge: '/notif.png', // iOS requires badge
-      icon: '/notif.png',
-    }).catch(err => console.error('Error showing notification:', err));
+      requireInteraction: true, // Keeps notification visible until user interacts
+      renotify: true, // Avoids duplicate stacking in some cases
+      badge: "/notif.png",
+      icon: "/notif.png",
+    }).catch(err => console.error("Error showing notification:", err));
   }
 });
 

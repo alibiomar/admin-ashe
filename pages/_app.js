@@ -9,40 +9,45 @@ function MyApp({ Component, pageProps }) {
   const [showPermission, setShowPermission] = useState(false);
   const [swRegistration, setSwRegistration] = useState(null);
 
-  // Register the service worker and handle updates
-  useEffect(() => {
-    if ("serviceWorker" in navigator) {
-      const registerSW = async () => {
-        try {
-          // Register your service worker located at /sw.js
-          const registration = await navigator.serviceWorker.register("/sw.js");
-          console.log("Service Worker Registered");
-          setSwRegistration(registration);
+// Register the service worker and handle updates
+useEffect(() => {
+  if ("serviceWorker" in navigator) {
+    const registerSW = async () => {
+      try {
+        const registration = await navigator.serviceWorker.register("/sw.js");
+        console.log("Service Worker Registered");
+        setSwRegistration(registration);
 
-          // Listen for updates to the service worker
-          registration.addEventListener("updatefound", () => {
-            const newWorker = registration.installing;
-            newWorker.addEventListener("statechange", () => {
-              if (newWorker.state === "activated") {
-                console.log("Service Worker updated and activated");
-              }
-            });
+        // Ensure the service worker is active before sending messages
+        if (registration.active) {
+          console.log("Service Worker is active");
+        } else {
+          registration.addEventListener("statechange", () => {
+            if (registration.active) {
+              console.log("Service Worker is now active");
+              setSwRegistration(registration);
+            }
           });
-        } catch (err) {
-          console.error("Service Worker Registration Failed:", err);
         }
-      };
 
-      registerSW();
+        // Handle service worker updates
+        registration.addEventListener("updatefound", () => {
+          const newWorker = registration.installing;
+          newWorker.addEventListener("statechange", () => {
+            if (newWorker.state === "activated") {
+              console.log("Service Worker updated and activated");
+            }
+          });
+        });
+      } catch (err) {
+        console.error("Service Worker Registration Failed:", err);
+      }
+    };
 
-      // Listen for messages from the service worker (optional)
-      navigator.serviceWorker.addEventListener("message", (event) => {
-        if (event.data.type === "NOTIFICATION_CLICKED") {
-          // Handle notification click events if needed
-        }
-      });
-    }
-  }, []);
+    registerSW();
+  }
+}, []);
+
 
   // Delay showing the notification permission request until user interaction
   useEffect(() => {

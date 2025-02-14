@@ -17,7 +17,16 @@ export default function CollectionListener({ swRegistration }) {
     const unsubscribe = onSnapshot(collectionRef, (snapshot) => {
       snapshot.docChanges().forEach((change) => {
         if (change.type === "added") {
-          console.log("New document added: ", change.doc.data());
+          if (swRegistration.active) {
+            swRegistration.active.postMessage({
+              type: "TRIGGER_NOTIFICATION",
+              title: "New Order Received",
+              options: {
+                body: "Hey ASHE, a new order has been placed.",
+                icon: "/notif.png", // Ensure this path matches your icon in the public folder
+              },
+            });
+          }
         }
       });
     });
