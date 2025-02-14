@@ -107,3 +107,15 @@ self.addEventListener('fetch', (event) => {
       })
   );
 });
+self.addEventListener("install", (event) => {
+  event.waitUntil(
+    caches.open("my-cache").then((cache) => {
+      return cache.addAll([
+        "/",
+        "/index.html",
+        "/styles.css",
+        "/notif.png"
+      ]).catch((err) => console.warn("❌ Failed to cache some resources:", err));
+    })
+  );
+});

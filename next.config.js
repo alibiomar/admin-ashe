@@ -1,5 +1,7 @@
 const withPWA = require("next-pwa");
 
+const isDev = process.env.NODE_ENV === "development";
+
 const nextConfig = {
   devIndicators: {
     buildActivity: false, // Keep this in the main Next.js config
@@ -8,7 +10,7 @@ const nextConfig = {
     remotePatterns: [
       {
         protocol: 'https',
-        hostname: '**.dropbox.com', // Wildcard for subdomains
+        hostname: '**.dropbox.com',
       },
       {
         protocol: 'https',
@@ -20,11 +22,11 @@ const nextConfig = {
       },
       {
         protocol: 'https',
-        hostname: 'firebasestorage.googleapis.com', // Firebase Storage
+        hostname: 'firebasestorage.googleapis.com',
       },
       {
         protocol: 'https',
-        hostname: 'lh3.googleusercontent.com', // Google user content
+        hostname: 'lh3.googleusercontent.com',
       },
     ],
   },
@@ -34,7 +36,8 @@ const nextConfig = {
 };
 
 module.exports = withPWA({
-  dest: "public", // PWA specific options
+  dest: "public",
   register: true,
   skipWaiting: true,
+  disable: isDev, // ⬅️ Disable PWA in development mode
 })(nextConfig);
