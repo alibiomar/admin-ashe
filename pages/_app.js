@@ -14,34 +14,36 @@ function MyApp({ Component, pageProps }) {
       const registerSW = async () => {
         try {
           const registration = await navigator.serviceWorker.register("/sw.js");
-          console.log("Service Worker Registered:", registration);
-  
+
+          // If the service worker is already active, set it immediately
+          if (registration.active) {
+            setSwRegistration(registration);
+          }
+
           registration.addEventListener("updatefound", () => {
             const newWorker = registration.installing;
-            newWorker.addEventListener("statechange", () => {
-              if (newWorker.state === "activated") {
-                console.log("Service Worker activated");
-                setSwRegistration(registration); // Store the registration when it's active
-              }
-            });
+            if (newWorker) {
+              newWorker.addEventListener("statechange", () => {
+                if (newWorker.state === "activated") {
+                  setSwRegistration(registration);
+                }
+              });
+            }
           });
         } catch (err) {
           console.error("Service Worker Registration Failed:", err);
         }
       };
-  
+
       registerSW();
     }
   }, []);
-  
-
 
   // Delay showing the notification permission request until user interaction
   useEffect(() => {
     let interactionTimeout;
 
     const handleUserInteraction = () => {
-      // Wait a moment to ensure the interaction is intentional
       interactionTimeout = setTimeout(() => {
         setShowPermission(true);
         removeEventListeners();
