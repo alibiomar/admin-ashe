@@ -156,7 +156,7 @@ export default function Orders() {
 
   // Enhanced modal design
   const renderShippingModal = () => (
-    <div className="fixed inset-0 bg-black bg-opacity-30 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+    <div className="fixed inset-0 bg-black bg-opacity-30 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-scroll">
       <div
         ref={modalRef} // Attach ref to the modal content
         className="bg-white rounded-2xl p-8 max-w-2xl w-full space-y-6 shadow-xl"
