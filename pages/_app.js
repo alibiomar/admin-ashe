@@ -1,9 +1,9 @@
 // pages/_app.js
 import { useEffect, useState } from "react";
 import { AuthProvider } from "../contexts/authContext";
-import {NotificationPermission} from "../components/NotificationPermission";
+import NotificationPermission from "../components/NotificationPermission";
 import "../styles/globals.css";
-import {CollectionListener} from "../components/CollectionListener";
+import CollectionListener from "../components/CollectionListener";
 
 function MyApp({ Component, pageProps }) {
   const [showPermission, setShowPermission] = useState(false);
