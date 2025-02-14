@@ -1,7 +1,9 @@
 {
   "name": "Admin Dashboard",
   "short_name": "Admin",
+  "description": "Admin Dashboard for order management",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#000000",
@@ -17,6 +19,12 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
+    },
+    {
+      "src": "/logo72.png",
+      "sizes": "72x72",
+      "type": "image/png",
+      "purpose": "any"
     }
   ],
   "permissions": ["notifications"],
@@ -42,5 +50,11 @@
     ],
     "default_vibration_pattern": [200, 100, 200],
     "default_notification_icon": "/notif.png"
+  },
+  "dir": "ltr",
+  "lang": "en",
+  "display_mode": "standalone",
+  "launch_handler": {
+    "client_mode": ["focus-existing", "auto"]
   }
 }
