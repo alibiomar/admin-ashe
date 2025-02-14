@@ -2,51 +2,79 @@
 import { useEffect, useState } from "react";
 import { AuthProvider } from "../contexts/authContext";
 import NotificationPermission from "../components/NotificationPermission";
-import "../styles/globals.css";
 import CollectionListener from "../components/CollectionListener";
+import "../styles/globals.css";
 
 function MyApp({ Component, pageProps }) {
   const [showPermission, setShowPermission] = useState(false);
+  const [swRegistration, setSwRegistration] = useState(null);
 
-  // Register the service worker
+  // Register the service worker and handle updates
   useEffect(() => {
     if ("serviceWorker" in navigator) {
-      navigator.serviceWorker
-        .register("/sw.js")
-        .then(() => console.log("Service Worker Registered"))
-        .catch((err) => console.error("Service Worker Registration Failed:", err));
+      const registerSW = async () => {
+        try {
+          const registration = await navigator.serviceWorker.register("/sw.js");
+          console.log("Service Worker Registered");
+          setSwRegistration(registration);
+
+          // Handle service worker updates
+          registration.addEventListener('updatefound', () => {
+            const newWorker = registration.installing;
+            newWorker.addEventListener('statechange', () => {
+              if (newWorker.state === 'activated') {
+                console.log('Service Worker updated and activated');
+              }
+            });
+          });
+
+        } catch (err) {
+          console.error("Service Worker Registration Failed:", err);
+        }
+      };
+
+      registerSW();
+
+      // Handle service worker communication
+      navigator.serviceWorker.addEventListener('message', (event) => {
+        if (event.data.type === 'NOTIFICATION_CLICKED') {
+        }
+      });
     }
   }, []);
 
-  // Delay showing the permission request until the user interacts with the app
+  // Delay showing the permission request until user interaction
   useEffect(() => {
+    let interactionTimeout;
+    
     const handleUserInteraction = () => {
-      setShowPermission(true);
-      // Remove the event listener after the first interaction
+      // Add a small delay to ensure the interaction is intentional
+      interactionTimeout = setTimeout(() => {
+        setShowPermission(true);
+        removeEventListeners();
+      }, 1000);
+    };
+
+    const removeEventListeners = () => {
       window.removeEventListener("click", handleUserInteraction);
       window.removeEventListener("scroll", handleUserInteraction);
       window.removeEventListener("keydown", handleUserInteraction);
     };
 
-    // Wait for user interaction before showing the permission request
     window.addEventListener("click", handleUserInteraction);
     window.addEventListener("scroll", handleUserInteraction);
     window.addEventListener("keydown", handleUserInteraction);
 
     return () => {
-      window.removeEventListener("click", handleUserInteraction);
-      window.removeEventListener("scroll", handleUserInteraction);
-      window.removeEventListener("keydown", handleUserInteraction);
+      clearTimeout(interactionTimeout);
+      removeEventListeners();
     };
   }, []);
 
   return (
     <AuthProvider>
-      {/* Show NotificationPermission after user interaction */}
       {showPermission && <NotificationPermission />}
-      <CollectionListener />
-
-      {/* Render the page component */}
+      {swRegistration && <CollectionListener swRegistration={swRegistration} />}
       <Component {...pageProps} />
     </AuthProvider>
   );

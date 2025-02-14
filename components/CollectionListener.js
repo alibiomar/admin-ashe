@@ -2,16 +2,14 @@ import { useEffect } from "react";
 import { collection, query, onSnapshot } from "firebase/firestore";
 import { db } from "../lib/firebaseClient";
 
-export default function CollectionListener() {
+export default function CollectionListener({ swRegistration }) {
   useEffect(() => {
-    const setupNotifications = async () => {
-      // First ensure notification permission is granted
-      if (Notification.permission !== 'granted') {
-        const permission = await Notification.requestPermission();
-        if (permission !== 'granted') return;
-      }
+    if (!swRegistration) return;
 
-      // Setup Firestore listener
+    const setupNotifications = async () => {
+      // Only proceed if notification permission is granted
+      if (Notification.permission !== 'granted') return;
+
       const q = query(collection(db, "orders"));
       const unsubscribe = onSnapshot(q, async (snapshot) => {
         snapshot.docChanges().forEach(async (change) => {
@@ -19,22 +17,19 @@ export default function CollectionListener() {
             const order = change.doc.data();
             
             try {
-              // Wait for service worker to be ready
-              const registration = await navigator.serviceWorker.ready;
-              
-              // Send message to service worker
-              registration.active.postMessage({
+              await swRegistration.active.postMessage({
                 type: "TRIGGER_NOTIFICATION",
                 title: "New Order!",
                 options: {
                   body: `You have a new order! Details: ${order.details || "N/A"}`,
                   icon: "/notif.png",
-                  requireInteraction: true, // Keep notification until user interacts
-                  vibrate: [200, 100, 200], // Vibration pattern
-                  tag: 'new-order', // Tag to prevent duplicate notifications
-                  data: { // Custom data you might need
+                  requireInteraction: true,
+                  vibrate: [200, 100, 200],
+                  tag: `order-${change.doc.id}`,
+                  data: {
                     orderId: change.doc.id,
-                    timestamp: new Date().toISOString()
+                    timestamp: new Date().toISOString(),
+                    url: `/admin/orders/` // URL to navigate to when clicked
                   }
                 },
               });
@@ -49,7 +44,7 @@ export default function CollectionListener() {
     };
 
     setupNotifications();
-  }, []);
+  }, [swRegistration]);
 
   return null;
 }
