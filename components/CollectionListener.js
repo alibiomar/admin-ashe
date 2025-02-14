@@ -1,47 +1,28 @@
 import { useEffect } from "react";
-import { collection, query, onSnapshot } from "firebase/firestore";
+import { collection, onSnapshot } from "firebase/firestore";
 import { db } from "../lib/firebaseClient";
 
 export default function CollectionListener({ swRegistration }) {
   useEffect(() => {
+    // Only proceed if swRegistration is provided
     if (!swRegistration) return;
 
-    const setupNotifications = async () => {
-      if (Notification.permission !== 'granted') return;
+    // Check for notification permission
+    if (Notification.permission !== "granted") return;
 
-      const q = query(collection(db, "orders"));
-      const unsubscribe = onSnapshot(q, async (snapshot) => {
-        snapshot.docChanges().forEach(async (change) => {
-          if (change.type === "added" || change.type === "modified") {
-            const order = change.doc.data();
-            
-            try {
-              await swRegistration.active.postMessage({
-                type: "TRIGGER_NOTIFICATION",
-                title: "New Order!",
-                options: {
-                  body: `You have a new order! Details: ${order.details || "N/A"}`,
-                  icon: "/notif.png",
-                  requireInteraction: true,
-                  vibrate: [200, 100, 200],
-                  tag: `order-${change.doc.id}`,
-                  data: {
-                    orderId: change.doc.id,
-                    timestamp: new Date().toISOString()
-                  }
-                },
-              });
-            } catch (error) {
-              console.error("Error sending notification:", error);
-            }
-          }
-        });
+    // Define your Firestore collection reference
+    const collectionRef = collection(db, "orders");
+
+    // Set up the real-time listener
+    const unsubscribe = onSnapshot(collectionRef, (snapshot) => {
+      snapshot.docChanges().forEach((change) => {
+        if (change.type === "added") {
+          console.log("New document added: ", change.doc.data());
+        }
       });
+    });
 
-      return () => unsubscribe();
-    };
-
-    setupNotifications();
+    return () => unsubscribe();
   }, [swRegistration]);
 
   return null;

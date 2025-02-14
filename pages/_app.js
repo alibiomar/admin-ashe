@@ -14,20 +14,20 @@ function MyApp({ Component, pageProps }) {
     if ("serviceWorker" in navigator) {
       const registerSW = async () => {
         try {
+          // Register your service worker located at /sw.js
           const registration = await navigator.serviceWorker.register("/sw.js");
           console.log("Service Worker Registered");
           setSwRegistration(registration);
 
-          // Handle service worker updates
-          registration.addEventListener('updatefound', () => {
+          // Listen for updates to the service worker
+          registration.addEventListener("updatefound", () => {
             const newWorker = registration.installing;
-            newWorker.addEventListener('statechange', () => {
-              if (newWorker.state === 'activated') {
-                console.log('Service Worker updated and activated');
+            newWorker.addEventListener("statechange", () => {
+              if (newWorker.state === "activated") {
+                console.log("Service Worker updated and activated");
               }
             });
           });
-
         } catch (err) {
           console.error("Service Worker Registration Failed:", err);
         }
@@ -35,20 +35,21 @@ function MyApp({ Component, pageProps }) {
 
       registerSW();
 
-      // Handle service worker communication
-      navigator.serviceWorker.addEventListener('message', (event) => {
-        if (event.data.type === 'NOTIFICATION_CLICKED') {
+      // Listen for messages from the service worker (optional)
+      navigator.serviceWorker.addEventListener("message", (event) => {
+        if (event.data.type === "NOTIFICATION_CLICKED") {
+          // Handle notification click events if needed
         }
       });
     }
   }, []);
 
-  // Delay showing the permission request until user interaction
+  // Delay showing the notification permission request until user interaction
   useEffect(() => {
     let interactionTimeout;
-    
+
     const handleUserInteraction = () => {
-      // Add a small delay to ensure the interaction is intentional
+      // Wait a moment to ensure the interaction is intentional
       interactionTimeout = setTimeout(() => {
         setShowPermission(true);
         removeEventListeners();
