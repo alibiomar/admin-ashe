@@ -1,5 +1,6 @@
-module.exports = {
-  
+const withPWA = require("next-pwa");
+
+const nextConfig = {
   devIndicators: {
     buildActivity: false,
   },
@@ -14,7 +15,8 @@ module.exports = {
         protocol: 'https',
         hostname: 'via.placeholder.com',
       },
-      { protocol: 'https',
+      {
+        protocol: 'https',
         hostname: 'dl.dropboxusercontent.com',
       },
       {
@@ -24,7 +26,7 @@ module.exports = {
       {
         protocol: 'https',
         hostname: 'lh3.googleusercontent.com', // Google user content
-      }
+      },
     ],
   },
 
@@ -32,13 +34,14 @@ module.exports = {
   poweredByHeader: false,
   reactStrictMode: true,
   productionBrowserSourceMaps: false,
-};
-const withPWA = require("next-pwa");
 
-module.exports = withPWA({
+  // PWA Configuration
   pwa: {
     dest: "public",
     register: true,
     skipWaiting: true,
+    disable: process.env.NODE_ENV === "development", // Disable PWA in development
   },
-});
+};
+
+module.exports = withPWA(nextConfig);
