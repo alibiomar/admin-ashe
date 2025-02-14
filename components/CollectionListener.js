@@ -4,28 +4,43 @@ import { db } from "../lib/firebaseClient";
 
 export default function CollectionListener({ swRegistration }) {
   useEffect(() => {
-    // Only proceed if swRegistration is provided
-    if (!swRegistration) return;
+    if (!swRegistration) {
+      console.warn("No service worker registration available.");
+      return;
+    }
 
-    // Check for notification permission
-    if (Notification.permission !== "granted") return;
+    if (Notification.permission !== "granted") {
+      console.warn("Notification permission not granted.");
+      return;
+    }
 
-    // Define your Firestore collection reference
+    console.log("Listening for Firestore changes...");
+
+    // Define Firestore collection reference
     const collectionRef = collection(db, "orders");
 
-    // Set up the real-time listener
+    // Set up Firestore real-time listener
     const unsubscribe = onSnapshot(collectionRef, (snapshot) => {
       snapshot.docChanges().forEach((change) => {
         if (change.type === "added") {
-          if (swRegistration.active) {
-            swRegistration.active.postMessage({
+          const orderData = change.doc.data();
+          console.log("New order detected:", orderData);
+
+          // Send message to service worker to trigger notification
+          if (navigator.serviceWorker.controller) {
+            console.log("Sending notification message to service worker...");
+            navigator.serviceWorker.controller.postMessage({
               type: "TRIGGER_NOTIFICATION",
-              title: "New Order Received",
+              title: "New Order Received!",
               options: {
-                body: "Hey ASHE, a new order has been placed.",
-                icon: "/notif.png", // Ensure this path matches your icon in the public folder
+                body: `Order from ${orderData.customerName || "Unknown"}`,
+                icon: "/notif.png",
+                badge: "/notif.png",
+                data: { url: "/orders" },
               },
             });
+          } else {
+            console.warn("No active service worker controller.");
           }
         }
       });
