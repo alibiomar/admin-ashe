@@ -29,9 +29,9 @@ serviceAccountKey.json
 .next
 
 # PWA files
-vzsw.js
-vzworkbox-*.js
-vzworker-*.js
-vzsw.js.map
-vzworkbox-*.js.map
-vzworker-*.js.map
+sw.js
+workbox-*.js
+worker-*.js
+sw.js.map
+workbox-*.js.map
+worker-*.js.map
