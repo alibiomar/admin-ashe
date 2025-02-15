@@ -1,7 +1,7 @@
 import { clientsClaim } from 'workbox-core';
 import { precacheAndRoute } from 'workbox-precaching';
 import { registerRoute } from 'workbox-routing';
-import { StaleWhileRevalidate, NetworkFirst } from 'workbox-strategies';
+import { StaleWhileRevalidate } from 'workbox-strategies';
 
 // Take immediate control of the page
 clientsClaim();
@@ -33,14 +33,6 @@ const NOTIFICATION_CONFIG = {
     retryDelay: 2000
 };
 
-// Enhanced precaching
-const combinedPrecacheList = [
-    ...(self.__WB_MANIFEST || []),
-    ...CACHE_CONFIG.precacheList.map(url => ({
-        url,
-        revision: CACHE_CONFIG.version
-    }))
-];
 
 const uniquePrecacheList = Array.from(
     new Map(combinedPrecacheList.map(item => [item.url, item])).values()
@@ -75,12 +67,6 @@ registerRoute(
     })
 );
 
-registerRoute(
-    ({ url }) => url.pathname.includes('/api/'),
-    new NetworkFirst({
-        cacheName: CACHE_CONFIG.apiCache
-    })
-);
 
 // Fetch event handler with offline fallback
 self.addEventListener('fetch', event => {
