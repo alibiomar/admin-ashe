@@ -3,7 +3,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from '../lib/firebaseClient';
 
-export default function CollectionListener({ swRegistration }) {
+export default function CollectionListener() {
   const [isListening, setIsListening] = useState(false);
   const [retryCount, setRetryCount] = useState(0); // Retry count for Firestore listener
 
