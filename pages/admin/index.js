@@ -7,46 +7,25 @@ export default function Dashboard() {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  useEffect(() => {
-    // Register the service worker for FCM
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/firebase-messaging-sw.js')
-        .then((registration) => {
-          console.log('Service Worker registered with scope:', registration.scope);
-        })
-        .catch((err) => {
-          console.error('Service Worker registration failed:', err);
-        });
-    }
-    if (messaging) {
-      Notification.requestPermission().then((permission) => {
-        if (permission === 'granted') {
-          console.log('Notification permission granted.');
-          getToken(messaging, { vapidKey: process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY })
-            .then((currentToken) => {
-              if (currentToken) {
-                console.log('FCM token:', currentToken);
 
-                const tokenRef = doc(firestore, 'fcmTokens', 'admin');
-                setDoc(tokenRef, {
-                  token: currentToken,
-                  updatedAt: new Date().toISOString(),
-                })
-                .then(() => console.log('FCM token stored successfully.'))
-                .catch((error) => console.error('Error storing FCM token:', error));
-              } else {
-                console.log('No registration token available. Request permission to generate one.');
-              }
-            })
-            .catch((err) => {
-              console.error('Error retrieving token:', err);
-            });
+    async function requestFCMToken() {
+      try {
+        const token = await getToken(messaging, { vapidKey: process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY });
+        if (token) {
+          console.log("FCM Token:", token);
+              await fetch("/api/saveAdminToken", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ fcmToken: token }),
+          });
         } else {
-          console.log('Unable to get permission to notify.');
+          console.log("No registration token available. Request permission.");
         }
-      });
+      } catch (error) {
+        console.error("Error retrieving FCM token:", error);
+      }
     }
-  }, []);
+    requestFCMToken();
 
 
   useEffect(() => {
