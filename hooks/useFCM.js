@@ -3,10 +3,14 @@ import { getToken, onMessage } from 'firebase/messaging';
 import { messaging } from '../lib/firebaseClient';
 
 const useFCM = () => {
-  useEffect(() => {
-    if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
-      // Request notification permission
-      const requestPermission = async () => {
+    useEffect(() => {
+      if (
+        typeof window === 'undefined' || 
+        !messaging || 
+        !('serviceWorker' in navigator)
+      ) return;
+  
+      const initFCM = async () => {
         try {
           const permission = await Notification.requestPermission();
           if (permission === 'granted') {
@@ -14,31 +18,26 @@ const useFCM = () => {
               vapidKey: process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY
             });
             console.log('FCM Token:', token);
-            // Send token to your backend
+            // Send token to backend
           }
+  
+          // Handle foreground messages
+          onMessage(messaging, (payload) => {
+            console.log('Foreground message:', payload);
+            if (payload.notification) {
+              new Notification(payload.notification.title, {
+                body: payload.notification.body,
+                icon: payload.notification.icon
+              });
+            }
+          });
         } catch (error) {
-          console.error('Error getting permission:', error);
+          console.error('FCM Error:', error);
         }
       };
-
-      // Listen for foreground messages
-      onMessage(messaging, (payload) => {
-        console.log('Foreground message:', payload);
-        // Display notification
-        if (payload.notification) {
-          new Notification(payload.notification.title, {
-            body: payload.notification.body,
-            icon: payload.notification.icon
-          });
-        }
-      });
-
-      // Initial permission check
-      if (Notification.permission === 'default') {
-        requestPermission();
-      }
-    }
-  }, []);
-};
-
-export default useFCM;
+  
+      initFCM();
+    }, []);
+  };
+  
+  export default useFCM;
