@@ -11,9 +11,6 @@ export async function requestNotificationPermission() {
       const token = await getToken(messaging, {
         vapidKey: process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY
       });
-      
-      // Save token to localStorage for demo purposes
-      // In production, you might want to save this to your database
       localStorage.setItem('fcmToken', token);
       return token;
     }

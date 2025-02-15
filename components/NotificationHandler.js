@@ -58,7 +58,7 @@ export default function NotificationHandler() {
                 if (Notification.permission === 'granted') {
                   new Notification('New Order Received', {
                     body: `Order #${order.id} has been placed`,
-                    icon: '/icon-192x192.png'
+                    icon: '/notif.png'
                   });
                 }
               }
@@ -72,7 +72,7 @@ export default function NotificationHandler() {
             console.log('Received foreground message:', payload);
             new Notification(payload.notification?.title || 'New Order', {
               body: payload.notification?.body,
-              icon: '/icon-192x192.png'
+              icon: '/notif.png'
             });
           });
 

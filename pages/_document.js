@@ -1,5 +1,6 @@
 // pages/_document.js
 import { Html, Head, Main, NextScript } from 'next/document';
+import NotificationHandler from '../components/NotificationHandler';
 
 export default function Document() {
   return (
@@ -32,6 +33,8 @@ export default function Document() {
       </Head>
       <body>
         <Main />
+        <NotificationHandler />
+
         <NextScript />
       </body>
     </Html>
