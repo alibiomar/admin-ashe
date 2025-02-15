@@ -29,6 +29,7 @@ serviceAccountKey.json
 .next
 
 # PWA files
+public/firebase-messaging-sw.js
 public/sw.js
 public/workbox-*.js
 public/worker-*.js

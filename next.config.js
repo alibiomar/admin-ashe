@@ -39,5 +39,5 @@ module.exports = withPWA({
   disable: isDev, // Disable PWA in development mode
   dest: 'public', // Destination folder for PWA files
   register: true,  // Automatically register the service worker
-  sw: 'sw.js',   // Service worker file
+  sw: 'firebase-messaging-sw.js',   // Service worker file
 })(nextConfig);
