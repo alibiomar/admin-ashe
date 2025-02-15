@@ -93,7 +93,7 @@ export default function Orders() {
             const newOrder = change.doc.data();
             new Notification("New Order Received!", {
               body: `Order #${change.doc.id.slice(0, 8)} - ${newOrder.userInfo?.name || "Unknown Customer"}`,
-              icon: "/notif.png",
+              icon: "/notif.jpg",
             });
           }
         });

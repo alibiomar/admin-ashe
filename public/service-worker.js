@@ -23,13 +23,13 @@ self.addEventListener('install', (event) => {
   
     const title = notificationData.title || 'New Notification';
     const body = notificationData.body || 'You have a new message!';
-    const icon = notificationData.icon || '/notif.png'; // Default icon
+    const icon = notificationData.icon || '/notif.jpg'; // Default icon
   
     // Set up the options for the notification
     const options = {
       body: body,
       icon: icon,
-      badge: '/notif.png', // Optional: badge icon for notification
+      badge: '/notif.jpg', // Optional: badge icon for notification
       data: notificationData.data || {}, // Additional data to attach to the notification
     };
   
