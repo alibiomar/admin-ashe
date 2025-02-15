@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { onMessage } from 'firebase/messaging';
-import { messaging } from '../lib/firebase';
+import { messaging } from '../lib/firebaseClient';
 import { requestNotificationPermission, listenToNewOrders } from '../utils/notifications';
 
 export default function NotificationHandler() {
