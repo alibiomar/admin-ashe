@@ -2,10 +2,8 @@
 import { useEffect, useState, useCallback } from 'react';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from '../lib/firebaseClient';
-import { useNotifications } from '../hooks/useNotifications';
 
 export default function CollectionListener({ swRegistration }) {
-  const { sendNotification} = useNotifications(swRegistration);
   const [isListening, setIsListening] = useState(false);
   const [retryCount, setRetryCount] = useState(0); // Retry count for Firestore listener
 
