@@ -1,4 +1,3 @@
-// public/sw.js
 const CACHE_NAME = 'admin-dashboard-v1';
 
 const urlsToCache = [
@@ -7,18 +6,19 @@ const urlsToCache = [
   '/notif.png',
   '/logo192.png',
   '/logo512.png',
-  '/manifest.json'
+  '/manifest.json',
+  '/styles.css'  // Added from your second install event
 ];
 
-// Install event
+// Install event - Remove duplicate install listener
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then((cache) => {
         console.log('Opened cache');
-        return cache.addAll(urlsToCache);
+        return cache.addAll(urlsToCache)
+          .catch((err) => console.error('Cache installation failed:', err));
       })
-      .catch((err) => console.error('Cache installation failed:', err))
   );
   self.skipWaiting();
 });
@@ -39,7 +39,45 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
-// Handle notification clicks for PWA
+// Fetch event with improved error handling
+self.addEventListener('fetch', (event) => {
+  event.respondWith(
+    caches.match(event.request)
+      .then((response) => {
+        if (response) {
+          return response;
+        }
+        
+        return fetch(event.request)
+          .then(response => {
+            // Don't cache if not a valid response
+            if (!response || response.status !== 200 || response.type !== 'basic') {
+              return response;
+            }
+
+            const responseToCache = response.clone();
+
+            // Wrap cache operations in event.waitUntil
+            event.waitUntil(
+              caches.open(CACHE_NAME)
+                .then(cache => {
+                  cache.put(event.request, responseToCache);
+                })
+                .catch(err => console.error('Cache put failed:', err))
+            );
+
+            return response;
+          })
+          .catch(error => {
+            console.error('Fetch failed:', error);
+            // Optionally return a custom offline page
+            // return caches.match('/offline.html');
+          });
+      })
+  );
+});
+
+// Notification click handler
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
 
@@ -47,75 +85,32 @@ self.addEventListener('notificationclick', (event) => {
     self.clients.matchAll({
       type: 'window',
       includeUncontrolled: true
-    }).then((clientList) => {
-      // Try to find an open PWA window
+    })
+    .then((clientList) => {
       for (const client of clientList) {
-        // Check if we have an open window/tab
         if ('focus' in client) {
           return client.focus();
         }
       }
-      
-      // If no open window found, open the PWA
       return self.clients.openWindow('/');
     })
+    .catch(err => console.error('Error handling notification click:', err))
   );
 });
 
-// Handle messages from the client (web app)
+// Message handler
 self.addEventListener("message", (event) => {
-  if (event.data.type === "TRIGGER_NOTIFICATION") {
+  if (event.data?.type === "TRIGGER_NOTIFICATION") {
     const { title, options } = event.data;
 
-    // Ensure notifications are shown correctly
-    self.registration.showNotification(title, {
-      ...options,
-      requireInteraction: true, // Keeps notification visible until user interacts
-      renotify: true, // Avoids duplicate stacking in some cases
-      badge: "/notif.png",
-      icon: "/notif.png",
-    }).catch(err => console.error("Error showing notification:", err));
+    event.waitUntil(
+      self.registration.showNotification(title, {
+        ...options,
+        requireInteraction: true,
+        renotify: true,
+        badge: "/notif.png",
+        icon: "/notif.png",
+      }).catch(err => console.error("Error showing notification:", err))
+    );
   }
-});
-
-// Fetch event with offline support
-self.addEventListener('fetch', (event) => {
-  event.respondWith(
-    caches.match(event.request)
-      .then((response) => {
-        // Return cached response if found
-        if (response) {
-          return response;
-        }
-        return fetch(event.request).then(response => {
-          // Check if we received a valid response
-          if (!response || response.status !== 200 || response.type !== 'basic') {
-            return response;
-          }
-
-          // Clone the response
-          const responseToCache = response.clone();
-
-          // Add to cache
-          caches.open(CACHE_NAME)
-            .then(cache => {
-              cache.put(event.request, responseToCache);
-            });
-
-          return response;
-        });
-      })
-  );
-});
-self.addEventListener("install", (event) => {
-  event.waitUntil(
-    caches.open("my-cache").then((cache) => {
-      return cache.addAll([
-        "/",
-        "/index.html",
-        "/styles.css",
-        "/notif.png"
-      ]).catch((err) => console.warn("❌ Failed to cache some resources:", err));
-    })
-  );
 });
