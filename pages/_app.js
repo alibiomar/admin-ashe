@@ -10,7 +10,20 @@ function MyApp({ Component, pageProps }) {
   const [showPermission, setShowPermission] = useState(false);
   const [swRegistration, setSwRegistration] = useState(null);
   const [isSwReady, setIsSwReady] = useState(false);
-
+  const { storeCode } = router.query;
+  useEffect(() => {
+    if (storeCode) {
+      const manifestElement = document.getElementById("manifest");
+      const manifestString = JSON.stringify({
+        ...manifest,
+        start_url: `/s/${storeCode}`,
+      });
+      manifestElement?.setAttribute(
+        "href",
+        "data:application/json;charset=utf-8," + encodeURIComponent(manifestString),
+      );
+    }
+  }, [storeCode]);
   // Service Worker registration and management
   useEffect(() => {
     const initServiceWorker = async () => {
