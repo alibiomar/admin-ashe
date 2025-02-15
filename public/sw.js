@@ -1,1 +1,189 @@
-if(!self.define){let e,s={};const n=(n,a)=>(n=new URL(n+".js",a).href,s[n]||new Promise((s=>{if("document"in self){const e=document.createElement("script");e.src=n,e.onload=s,document.head.appendChild(e)}else e=n,importScripts(n),s()})).then((()=>{let e=s[n];if(!e)throw new Error(`Module ${n} didn’t register its module`);return e})));self.define=(a,i)=>{const t=e||("document"in self?document.currentScript.src:"")||location.href;if(s[t])return;let c={};const r=e=>n(e,t),o={module:{uri:t},exports:c,require:r};s[t]=Promise.all(a.map((e=>o[e]||r(e)))).then((e=>(i(...e),c)))}}define(["./workbox-07672ec7"],(function(e){"use strict";importScripts(),self.addEventListener("message",(e=>{e.data&&"SKIP_WAITING"===e.data.type&&self.skipWaiting()})),e.clientsClaim(),e.precacheAndRoute([{url:"/_next/dynamic-css-manifest.json",revision:"d751713988987e9331980363e24189ce"},{url:"/_next/static/EKk026Ud5WOY3XKx4pgji/_buildManifest.js",revision:"b78061c4ddf6742871965ff360ca39cc"},{url:"/_next/static/EKk026Ud5WOY3XKx4pgji/_ssgManifest.js",revision:"b6652df95db52feb4daf4eca35380933"},{url:"/_next/static/chunks/36d2f571-5f7d195c4cdf6ced.js",revision:"5f7d195c4cdf6ced"},{url:"/_next/static/chunks/484.da50829333201e55.js",revision:"da50829333201e55"},{url:"/_next/static/chunks/709.e04b3301a1eba8ef.js",revision:"e04b3301a1eba8ef"},{url:"/_next/static/chunks/805-0001e0cee37764b3.js",revision:"0001e0cee37764b3"},{url:"/_next/static/chunks/framework-a4ddb9b21624b39b.js",revision:"a4ddb9b21624b39b"},{url:"/_next/static/chunks/main-db2c1dfa806f964e.js",revision:"db2c1dfa806f964e"},{url:"/_next/static/chunks/pages/_app-19ff3f24050c32da.js",revision:"19ff3f24050c32da"},{url:"/_next/static/chunks/pages/_error-83eac0d438baeb80.js",revision:"83eac0d438baeb80"},{url:"/_next/static/chunks/pages/admin-8f4562de990ba64e.js",revision:"8f4562de990ba64e"},{url:"/_next/static/chunks/pages/admin/newsletter-f038ef406121839d.js",revision:"f038ef406121839d"},{url:"/_next/static/chunks/pages/admin/orders-e1f7e32ad5f4373c.js",revision:"e1f7e32ad5f4373c"},{url:"/_next/static/chunks/pages/admin/products-4abeb8d8493b9762.js",revision:"4abeb8d8493b9762"},{url:"/_next/static/chunks/pages/index-5acae01a80e854aa.js",revision:"5acae01a80e854aa"},{url:"/_next/static/chunks/polyfills-42372ed130431b0a.js",revision:"846118c33b2c0e922d7b3a7676f81f6f"},{url:"/_next/static/chunks/webpack-a198c8a9021f6728.js",revision:"a198c8a9021f6728"},{url:"/_next/static/css/ea06deb31f1bc0b4.css",revision:"ea06deb31f1bc0b4"},{url:"/favicon.ico",revision:"cb8f2637bbc708815b6ebd7e2616a91a"},{url:"/logo.png",revision:"c7522c9f905e3a5451e97310b615953d"},{url:"/logo192.png",revision:"4b841d5d44164914bd190487aa7019dd"},{url:"/logo512.png",revision:"3ee3ef34ed0f786cbd250388922041f8"},{url:"/logo72.png",revision:"bcf907d38552e3fae33c9623ad9d4622"},{url:"/logo96.png",revision:"977e96c6edb63d7f16e239ec2c05257a"},{url:"/manifest.json",revision:"d1dec39e0aba64b4eaaf80e6482f5b5a"},{url:"/notif.jpg",revision:"bf9016fa51e44517dfb7b85f9a6db49c"},{url:"/offline.html",revision:"dfe43141af0d8a1a65dbb36ad153ba01"}],{ignoreURLParametersMatching:[]}),e.cleanupOutdatedCaches(),e.registerRoute("/",new e.NetworkFirst({cacheName:"start-url",plugins:[{cacheWillUpdate:async({request:e,response:s,event:n,state:a})=>s&&"opaqueredirect"===s.type?new Response(s.body,{status:200,statusText:"OK",headers:s.headers}):s}]}),"GET"),e.registerRoute(/^https:\/\/fonts\.(?:gstatic)\.com\/.*/i,new e.CacheFirst({cacheName:"google-fonts-webfonts",plugins:[new e.ExpirationPlugin({maxEntries:4,maxAgeSeconds:31536e3})]}),"GET"),e.registerRoute(/^https:\/\/fonts\.(?:googleapis)\.com\/.*/i,new e.StaleWhileRevalidate({cacheName:"google-fonts-stylesheets",plugins:[new e.ExpirationPlugin({maxEntries:4,maxAgeSeconds:604800})]}),"GET"),e.registerRoute(/\.(?:eot|otf|ttc|ttf|woff|woff2|font.css)$/i,new e.StaleWhileRevalidate({cacheName:"static-font-assets",plugins:[new e.ExpirationPlugin({maxEntries:4,maxAgeSeconds:604800})]}),"GET"),e.registerRoute(/\.(?:jpg|jpeg|gif|png|svg|ico|webp)$/i,new e.StaleWhileRevalidate({cacheName:"static-image-assets",plugins:[new e.ExpirationPlugin({maxEntries:64,maxAgeSeconds:86400})]}),"GET"),e.registerRoute(/\/_next\/image\?url=.+$/i,new e.StaleWhileRevalidate({cacheName:"next-image",plugins:[new e.ExpirationPlugin({maxEntries:64,maxAgeSeconds:86400})]}),"GET"),e.registerRoute(/\.(?:mp3|wav|ogg)$/i,new e.CacheFirst({cacheName:"static-audio-assets",plugins:[new e.RangeRequestsPlugin,new e.ExpirationPlugin({maxEntries:32,maxAgeSeconds:86400})]}),"GET"),e.registerRoute(/\.(?:mp4)$/i,new e.CacheFirst({cacheName:"static-video-assets",plugins:[new e.RangeRequestsPlugin,new e.ExpirationPlugin({maxEntries:32,maxAgeSeconds:86400})]}),"GET"),e.registerRoute(/\.(?:js)$/i,new e.StaleWhileRevalidate({cacheName:"static-js-assets",plugins:[new e.ExpirationPlugin({maxEntries:32,maxAgeSeconds:86400})]}),"GET"),e.registerRoute(/\.(?:css|less)$/i,new e.StaleWhileRevalidate({cacheName:"static-style-assets",plugins:[new e.ExpirationPlugin({maxEntries:32,maxAgeSeconds:86400})]}),"GET"),e.registerRoute(/\/_next\/data\/.+\/.+\.json$/i,new e.StaleWhileRevalidate({cacheName:"next-data",plugins:[new e.ExpirationPlugin({maxEntries:32,maxAgeSeconds:86400})]}),"GET"),e.registerRoute(/\.(?:json|xml|csv)$/i,new e.NetworkFirst({cacheName:"static-data-assets",plugins:[new e.ExpirationPlugin({maxEntries:32,maxAgeSeconds:86400})]}),"GET"),e.registerRoute((({url:e})=>{if(!(self.origin===e.origin))return!1;const s=e.pathname;return!s.startsWith("/api/auth/")&&!!s.startsWith("/api/")}),new e.NetworkFirst({cacheName:"apis",networkTimeoutSeconds:10,plugins:[new e.ExpirationPlugin({maxEntries:16,maxAgeSeconds:86400})]}),"GET"),e.registerRoute((({url:e})=>{if(!(self.origin===e.origin))return!1;return!e.pathname.startsWith("/api/")}),new e.NetworkFirst({cacheName:"others",networkTimeoutSeconds:10,plugins:[new e.ExpirationPlugin({maxEntries:32,maxAgeSeconds:86400})]}),"GET"),e.registerRoute((({url:e})=>!(self.origin===e.origin)),new e.NetworkFirst({cacheName:"cross-origin",networkTimeoutSeconds:10,plugins:[new e.ExpirationPlugin({maxEntries:32,maxAgeSeconds:3600})]}),"GET")}));
+import { clientsClaim } from 'workbox-core';
+import { precacheAndRoute } from 'workbox-precaching';
+import { registerRoute } from 'workbox-routing';
+import { StaleWhileRevalidate, NetworkFirst } from 'workbox-strategies';
+
+// Take immediate control of the page
+clientsClaim();
+
+// Cache configuration
+const CACHE_CONFIG = {
+  version: 'v1',
+  staticCache: 'admin-dashboard-static-v1',
+  dynamicCache: 'admin-dashboard-dynamic-v1',
+  apiCache: 'admin-dashboard-api-v1',
+  precacheList: [
+    '/',
+    '/index.html',
+    '/notif.png',
+    '/logo192.png',
+    '/logo512.png',
+    '/manifest.json',
+    '/styles.css',
+    '/offline.html'
+  ]
+};
+
+// Notification configuration
+const NOTIFICATION_CONFIG = {
+  defaultIcon: '/notif.png',
+  defaultBadge: '/logo192.png',
+  defaultVibration: [200, 100, 200],
+  maxRetries: 3,
+  retryDelay: 2000
+};
+
+// Enhanced precaching
+precacheAndRoute(self.__WB_MANIFEST || []);
+precacheAndRoute(
+  CACHE_CONFIG.precacheList.map(url => ({
+    url,
+    revision: CACHE_CONFIG.version
+  }))
+);
+
+// Install event with improved error handling
+self.addEventListener('activate', event => {
+    clients.claim();
+    console.log('Ready!');
+});
+
+
+// Activate event with versioned cache cleanup
+self.addEventListener('activate', event => {
+    clients.claim();
+    console.log('Ready!');
+});
+
+// Enhanced notification handling with retries and confirmation
+const showNotificationWithRetry = async (title, options, source, attempt = 1) => {
+  try {
+    await self.registration.showNotification(title, {
+      ...options,
+      icon: options.icon || NOTIFICATION_CONFIG.defaultIcon,
+      badge: options.badge || NOTIFICATION_CONFIG.defaultBadge,
+      vibrate: options.vibrate || NOTIFICATION_CONFIG.defaultVibration,
+      timestamp: Date.now(),
+      requireInteraction: true,
+      actions: [
+        { action: 'view', title: 'View' },
+        { action: 'dismiss', title: 'Dismiss' }
+      ],
+      ...options
+    });
+
+    // Confirm successful notification
+    if (source) {
+      source.postMessage({
+        type: 'NOTIFICATION_CONFIRMED',
+        success: true,
+        notificationId: options.tag,
+        timestamp: Date.now()
+      });
+    }
+    
+    return true;
+  } catch (error) {
+    console.error(`❌ Notification attempt ${attempt} failed:`, error);
+    
+    if (attempt < NOTIFICATION_CONFIG.maxRetries) {
+      await new Promise(resolve => 
+        setTimeout(resolve, NOTIFICATION_CONFIG.retryDelay * attempt)
+      );
+      return showNotificationWithRetry(title, options, source, attempt + 1);
+    }
+    
+    if (source) {
+      source.postMessage({
+        type: 'NOTIFICATION_FAILED',
+        error: error.message,
+        notificationId: options.tag,
+        timestamp: Date.now()
+      });
+    }
+    
+    throw error;
+  }
+};
+
+// Enhanced message handler with async/await and error handling
+self.addEventListener('message', (event) => {
+  const { type, title, options } = event.data;
+  
+  if (type === 'SKIP_WAITING') {
+    self.skipWaiting();
+    return;
+  }
+
+  if (type === 'SW_STATUS_CHECK') {
+    event.source.postMessage({
+      type: 'SW_STATUS',
+      isActive: true,
+      timestamp: Date.now()
+    });
+    return;
+  }
+
+  if (type === 'TRIGGER_NOTIFICATION') {
+    event.waitUntil(
+      (async () => {
+        try {
+          await showNotificationWithRetry(title, options, event.source);
+        } catch (error) {
+          console.error('❌ Final notification attempt failed:', error);
+        }
+      })()
+    );
+  }
+});
+
+// Enhanced notification click handler with error handling
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  
+  event.waitUntil(
+    (async () => {
+      try {
+        const windowClients = await self.clients.matchAll({
+          type: 'window',
+          includeUncontrolled: true
+        });
+
+        if (windowClients.length > 0) {
+          const client = windowClients[0];
+          await client.focus();
+          client.postMessage({
+            type: 'NOTIFICATION_CLICKED',
+            action: event.action,
+            notificationId: event.notification.tag,
+            timestamp: Date.now()
+          });
+        } else {
+          await self.clients.openWindow(event.notification.data?.url || '/');
+        }
+      } catch (error) {
+        console.error('❌ Error handling notification click:', error);
+      }
+    })()
+  );
+});
+
+
+registerRoute(
+  ({request}) => 
+    request.destination === 'script' ||
+    request.destination === 'style' ||
+    request.destination === 'image',
+  new StaleWhileRevalidate({
+    cacheName: CACHE_CONFIG.staticCache
+  })
+);
+
+// Offline fallback remains the same
+self.addEventListener('fetch', (event) => {
+  if (event.request.mode === 'navigate') {
+    event.respondWith(
+      fetch(event.request).catch(() => caches.match('/offline.html'))
+    );
+  }
+});
