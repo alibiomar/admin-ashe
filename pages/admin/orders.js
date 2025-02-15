@@ -3,7 +3,7 @@ import AdminLayout from "../../components/layout/AdminLayout";
 import AuthCheck from "../../components/auth/AuthCheck";
 import { db } from "../../lib/firebaseClient";
 import { collection, onSnapshot, doc, updateDoc, query, orderBy } from "firebase/firestore";
-import { FiPackage, FiTruck, FiClock, FiXCircle, FiCheckCircle, FiUser, FiPhone, FiSearch, FiFilter, FiMail, FiMapPin } from "react-icons/fi";
+import { FiPackage, FiTruck, FiClock, FiXCircle, FiCheckCircle, FiUser, FiPhone, FiSearch, FiFilter } from "react-icons/fi";
 
 export default function Orders() {
   const [orders, setOrders] = useState([]);
@@ -30,31 +30,14 @@ export default function Orders() {
     });
   }, [orders, searchTerm, activeTab]);
 
-  // Request notification permission
+  // Request notification permission on component mount
   useEffect(() => {
     if ("Notification" in window) {
       Notification.requestPermission();
     }
   }, []);
 
-  // Close modal when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (modalRef.current && !modalRef.current.contains(event.target)) {
-        setSelectedOrder(null);
-      }
-    };
-
-    if (selectedOrder) {
-      document.addEventListener("mousedown", handleClickOutside);
-    }
-
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, [selectedOrder]);
-
-  // Fetch orders from Firestore
+  // Enhanced order fetching with sorting
   useEffect(() => {
     const ordersCollection = collection(db, "orders");
     const ordersQuery = query(ordersCollection, orderBy("createdAt", sortOrder));
@@ -100,29 +83,6 @@ export default function Orders() {
     return () => window.removeEventListener('error', handleError);
   }, []);
 
-  // Update order status
-  const updateOrderStatus = async (orderId, newStatus) => {
-    try {
-      const orderDoc = doc(db, "orders", orderId);
-      await updateDoc(orderDoc, { 
-        status: newStatus,
-        updatedAt: new Date().toISOString()
-      });
-
-      // Optimistic update
-      setOrders((prevOrders) =>
-        prevOrders.map((order) =>
-          order.id === orderId 
-            ? { ...order, status: newStatus, updatedAt: new Date().toISOString() } 
-            : order
-        )
-      );
-    } catch (err) {
-      setError("Failed to update order status: " + err.message);
-      console.error("Error updating order status:", err);
-    }
-  };
-
   // Search and filter controls
   const renderControls = () => (
     <div className="mb-6 space-y-4 md:space-y-0 md:flex md:items-center md:justify-between">
@@ -162,7 +122,6 @@ export default function Orders() {
       </p>
     </div>
   );
-
   // Render Order Card
   const renderOrderCard = (order) => (
     <div
@@ -201,7 +160,7 @@ export default function Orders() {
           </div>
           <div className="space-y-1">
             <label className="text-xs font-medium text-gray-400">STATUS</label>
-            <div className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
+            <div className={`inline-flex items-center px-3 py-1 rounded-full text-sm ${
               order.status === "Shipped" 
                 ? "bg-green-100 text-green-700"
                 : "bg-orange-100 text-orange-700"
@@ -240,11 +199,11 @@ export default function Orders() {
     </div>
   );
 
-  // Modal for order details
+  // Modal for shipping information
   const renderShippingModal = () => (
-    <div className="fixed inset-0 bg-black bg-opacity-30 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-auto">
+    <div className="fixed inset-0 bg-black bg-opacity-30 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-scroll">
       <div
-        ref={modalRef}
+        ref={modalRef} // Attach ref to the modal content
         className="bg-white rounded-2xl p-8 max-w-2xl w-full space-y-6 shadow-xl"
       >
         <div className="flex justify-between items-start">
@@ -254,7 +213,7 @@ export default function Orders() {
           </h3>
           <button
             onClick={() => setSelectedOrder(null)}
-            className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+            className="p-2 hover:bg-gray-100 rounded-full"
           >
             <FiXCircle className="text-gray-500 text-xl" />
           </button>
@@ -269,20 +228,13 @@ export default function Orders() {
               </h4>
               <div className="space-y-2 text-sm">
                 <p><span className="font-medium">Name:</span> {selectedOrder.userInfo?.name || "N/A"}</p>
-                <p className="flex items-center gap-2">
-                  <FiMail className="text-gray-400" />
-                  {selectedOrder.userInfo?.email || "N/A"}
-                </p>
-                <p className="flex items-center gap-2">
-                  <FiPhone className="text-gray-400" />
-                  {selectedOrder.userInfo?.phone || "N/A"}
-                </p>
+                <p><span className="font-medium">Email:</span> {selectedOrder.userInfo?.email || "N/A"}</p>
+                <p><span className="font-medium">Phone:</span> {selectedOrder.userInfo?.phone || "N/A"}</p>
               </div>
             </div>
-
             <div className="bg-gray-50 p-4 rounded-xl">
               <h4 className="font-medium mb-3 flex items-center gap-2">
-                <FiMapPin className="text-[#46c7c7]" />
+                <FiTruck className="text-[#46c7c7]" />
                 Shipping Information
               </h4>
               {selectedOrder.shippingInfo ? (
@@ -292,7 +244,7 @@ export default function Orders() {
                   <p>{selectedOrder.shippingInfo.zipCode}</p>
                 </div>
               ) : (
-                <p className="text-gray-400">No shipping information available</p>
+                <p className="text-gray-400">No shipping information</p>
               )}
             </div>
           </div>
@@ -342,29 +294,31 @@ export default function Orders() {
                 }`}
               >
                 {tab.charAt(0).toUpperCase() + tab.slice(1)} (
-                {tab === "pending" ? pendingOrders.length : shippedOrders.length})
+                {filteredOrders().filter(order => 
+                  tab === "pending" ? order.status === "Pending" : order.status === "Shipped"
+                ).length})
               </button>
             ))}
           </div>
         </div>
 
-        {loading && (
+        {renderControls()}
+
+        {loading ? (
           <div className="flex justify-center items-center h-32">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#46c7c7]"></div>
           </div>
-        )}
-
-        {error && (
+        ) : error ? (
           <div className="bg-red-50 border-l-4 border-red-400 p-4 rounded-lg mb-6">
             <p className="text-red-600 font-medium">{error}</p>
           </div>
+        ) : filteredOrders().length === 0 ? (
+          renderEmptyState()
+        ) : (
+          <div className="space-y-4">
+            {filteredOrders().map(renderOrderCard)}
+          </div>
         )}
-
-        <div className="space-y-4">
-          {(activeTab === "pending" ? pendingOrders : shippedOrders).map(
-            renderOrderCard
-          )}
-        </div>
 
         {selectedOrder && renderShippingModal()}
       </AdminLayout>
