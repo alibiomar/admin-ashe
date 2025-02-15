@@ -24,66 +24,56 @@ export default function Orders() {
   const [activeTab, setActiveTab] = useState("new"); // Default to "new" tab
   const [searchTerm, setSearchTerm] = useState("");
   const [sortOrder, setSortOrder] = useState("desc");
-  const [lastViewed, setLastViewed] = useState(0); // Track last viewed timestamp
+  const [lastCheck, setLastCheck] = useState({ 
+    timestamp: 0, // Last viewed timestamp
+    orderCount: 0 // Number of orders at last check
+  });
 
   const modalRef = useRef(null);
 
-  // Fetch or create the last viewed timestamp from Firestore
+  // Fetch last check data from Firestore
   useEffect(() => {
-    const fetchLastViewed = async () => {
+    const fetchLastCheck = async () => {
       try {
-        const lastOrderCheckRef = doc(db, "LastOrderCheck", "admin"); // Use a fixed document ID for the admin
-        const lastOrderCheckDoc = await getDoc(lastOrderCheckRef);
+        const docRef = doc(db, "LastOrderCheck", "admin");
+        const docSnap = await getDoc(docRef);
 
-        if (lastOrderCheckDoc.exists()) {
-          setLastViewed(lastOrderCheckDoc.data().lastViewed);
+        if (docSnap.exists()) {
+          setLastCheck(docSnap.data());
         } else {
           // Create the document if it doesn't exist
-          const initialLastViewed = Date.now();
-          await setDoc(lastOrderCheckRef, { lastViewed: initialLastViewed });
-          setLastViewed(initialLastViewed);
+          const initialData = {
+            timestamp: Date.now(),
+            orderCount: 0
+          };
+          await setDoc(docRef, initialData);
+          setLastCheck(initialData);
         }
       } catch (err) {
-        setError("Failed to fetch last viewed timestamp: " + err.message);
-        console.error("Error fetching last viewed timestamp:", err);
+        setError("Failed to load last check: " + err.message);
       }
     };
 
-    fetchLastViewed();
+    fetchLastCheck();
   }, []);
 
-  // Update the last viewed timestamp in Firestore when the component unmounts
+  // Save last check data on unmount
   useEffect(() => {
     return () => {
-      const updateLastViewed = async () => {
+      const updateLastCheck = async () => {
         try {
-          const lastOrderCheckRef = doc(db, "LastOrderCheck", "admin");
-          await setDoc(lastOrderCheckRef, { lastViewed: Date.now() }, { merge: true });
+          await setDoc(doc(db, "LastOrderCheck", "admin"), {
+            timestamp: Date.now(),
+            orderCount: orders.length
+          });
         } catch (err) {
-          console.error("Error updating last viewed timestamp:", err);
+          console.error("Failed to update last check:", err);
         }
       };
 
-      updateLastViewed();
+      updateLastCheck();
     };
-  }, []);
-
-  // Filter orders based on search term, active tab, and last viewed timestamp
-  const filteredOrders = useCallback(() => {
-    return orders.filter((order) => {
-      const createdAtMillis = getCreatedAtMillis(order.createdAt);
-      const isNew = createdAtMillis > lastViewed;
-      const matchesSearch =
-        order.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        order.userInfo?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        order.userInfo?.phone?.includes(searchTerm);
-      const matchesTab =
-        (activeTab === "pending" && order.status === "Pending") ||
-        (activeTab === "shipped" && order.status === "Shipped") ||
-        (activeTab === "new" && isNew);
-      return matchesSearch && matchesTab;
-    });
-  }, [orders, searchTerm, activeTab, lastViewed]);
+  }, [orders.length]);
 
   // Fetch orders from Firestore
   useEffect(() => {
@@ -96,7 +86,7 @@ export default function Orders() {
         const ordersData = ordersSnapshot.docs.map((doc) => ({
           id: doc.id,
           ...doc.data(),
-          createdAt: doc.data().createdAt, // Ensure createdAt is properly mapped
+          createdAt: doc.data().createdAt,
         }));
 
         // Show notifications for new orders
@@ -122,16 +112,41 @@ export default function Orders() {
     return () => unsubscribe();
   }, [sortOrder]);
 
-  // Error boundary handler
-  useEffect(() => {
-    const handleError = (error) => {
-      setError(`An unexpected error occurred: ${error.message}`);
-      setLoading(false);
-    };
+  // Filter orders based on search term, active tab, and last viewed timestamp
+  const filteredOrders = useCallback(() => {
+    return orders.filter((order) => {
+      const matchesSearch =
+        order.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        order.userInfo?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        order.userInfo?.phone?.includes(searchTerm);
 
-    window.addEventListener("error", handleError);
-    return () => window.removeEventListener("error", handleError);
-  }, []);
+      const matchesTab = {
+        new: getCreatedAtMillis(order.createdAt) > lastCheck.timestamp,
+        pending: order.status === "Pending",
+        shipped: order.status === "Shipped"
+      }[activeTab];
+
+      return matchesSearch && matchesTab;
+    });
+  }, [orders, searchTerm, activeTab, lastCheck.timestamp]);
+
+  // Calculate counts for all tabs
+  const getTabCount = useCallback((tab) => {
+    return orders.filter((order) => {
+      const matchesSearch =
+        order.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        order.userInfo?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        order.userInfo?.phone?.includes(searchTerm);
+
+      const matchesTab = {
+        new: getCreatedAtMillis(order.createdAt) > lastCheck.timestamp,
+        pending: order.status === "Pending",
+        shipped: order.status === "Shipped"
+      }[tab];
+
+      return matchesSearch && matchesTab;
+    }).length;
+  }, [orders, searchTerm, lastCheck.timestamp]);
 
   // Update order status
   const updateOrderStatus = async (orderId, newStatus) => {
@@ -144,7 +159,7 @@ export default function Orders() {
     }
   };
 
-  // Search and filter controls
+  // Render controls (search and sort)
   const renderControls = () => (
     <div className="mb-6 space-y-4 md:space-y-0 md:flex md:items-center md:justify-between">
       <div className="relative flex-1 max-w-md">
@@ -171,7 +186,7 @@ export default function Orders() {
     </div>
   );
 
-  // Empty state component
+  // Render empty state
   const renderEmptyState = () => (
     <div className="text-center py-12">
       <FiPackage className="mx-auto text-6xl text-gray-300 mb-4" />
@@ -184,7 +199,7 @@ export default function Orders() {
     </div>
   );
 
-  // Render Order Card
+  // Render order card
   const renderOrderCard = (order) => (
     <div
       key={order.id}
@@ -263,7 +278,7 @@ export default function Orders() {
     </div>
   );
 
-  // Modal for shipping information
+  // Render shipping modal
   const renderShippingModal = () => (
     <div className="fixed inset-0 bg-black bg-opacity-30 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-scroll">
       <div
@@ -379,17 +394,7 @@ export default function Orders() {
                     : "text-gray-500 hover:bg-gray-50"
                 }`}
               >
-                {tab.charAt(0).toUpperCase() + tab.slice(1)} (
-                {filteredOrders().filter((order) => {
-                  if (tab === "new") {
-                    return getCreatedAtMillis(order.createdAt) > lastViewed;
-                  } else if (tab === "pending") {
-                    return order.status === "Pending";
-                  } else {
-                    return order.status === "Shipped";
-                  }
-                }).length}
-                )
+                {tab.charAt(0).toUpperCase() + tab.slice(1)} ({getTabCount(tab)})
               </button>
             ))}
           </div>
