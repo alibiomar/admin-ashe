@@ -36,5 +36,4 @@ const nextConfig = {
 module.exports = withPWA({
   disable: isDev, // Disable PWA in development mode
   dest: 'public', // Destination folder for PWA files
-  sw: 'service-worker.js',   // Service worker file
 })(nextConfig);
