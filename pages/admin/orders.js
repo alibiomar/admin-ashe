@@ -2,8 +2,12 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import AdminLayout from "../../components/layout/AdminLayout";
 import AuthCheck from "../../components/auth/AuthCheck";
 import { db } from "../../lib/firebaseClient";
-import { collection, onSnapshot, doc, updateDoc, query, orderBy, setDoc, getDoc } from "firebase/firestore";
-import { FiPackage, FiTruck, FiClock, FiXCircle, FiCheckCircle, FiUser, FiPhone, FiSearch } from "react-icons/fi";
+import { 
+  collection, onSnapshot, doc, updateDoc, query, orderBy, setDoc, getDoc 
+} from "firebase/firestore";
+import { 
+  FiPackage, FiTruck, FiClock, FiXCircle, FiCheckCircle, FiUser, FiPhone, FiSearch 
+} from "react-icons/fi";
 
 // Helper function to safely convert createdAt to milliseconds
 const getCreatedAtMillis = (createdAt) => {
@@ -24,12 +28,19 @@ export default function Orders() {
   const [activeTab, setActiveTab] = useState("new"); // Default to "new" tab
   const [searchTerm, setSearchTerm] = useState("");
   const [sortOrder, setSortOrder] = useState("desc");
-  const [lastCheck, setLastCheck] = useState({ 
-    timestamp: 0, // Last viewed timestamp
-    orderCount: 0 // Number of orders at last check
-  });
+  // Initialize lastCheck as null so we know when it’s loaded
+  const [lastCheck, setLastCheck] = useState(null);
 
   const modalRef = useRef(null);
+  // Ref to skip notifications on initial load
+  const isInitialLoad = useRef(true);
+
+  // (Optional) Request Notification permission once on mount
+  useEffect(() => {
+    if (Notification.permission !== "granted") {
+      Notification.requestPermission();
+    }
+  }, []);
 
   // Fetch last check data from Firestore
   useEffect(() => {
@@ -89,16 +100,22 @@ export default function Orders() {
           createdAt: doc.data().createdAt,
         }));
 
-        // Show notifications for new orders
-        ordersSnapshot.docChanges().forEach((change) => {
-          if (change.type === "added" && Notification.permission === "granted") {
-            const newOrder = change.doc.data();
-            new Notification("New Order Received!", {
-              body: `Order #${change.doc.id.slice(0, 8)} - ${newOrder.userInfo?.name || "Unknown Customer"}`,
-              icon: "/notif.jpg",
-            });
-          }
-        });
+        // Only show notifications for orders added after the initial load
+        if (!isInitialLoad.current && Notification.permission === "granted") {
+          ordersSnapshot.docChanges().forEach((change) => {
+            if (change.type === "added") {
+              const newOrder = change.doc.data();
+              new Notification("New Order Received!", {
+                body: `Order #${change.doc.id.slice(0, 8)} - ${newOrder.userInfo?.name || "Unknown Customer"}`,
+                icon: "/notif.jpg",
+              });
+            }
+          });
+        }
+        // Mark initial load as done after the first snapshot
+        if (isInitialLoad.current) {
+          isInitialLoad.current = false;
+        }
 
         setOrders(ordersData);
         setLoading(false);
@@ -121,14 +138,15 @@ export default function Orders() {
         order.userInfo?.phone?.includes(searchTerm);
 
       const matchesTab = {
-        new: getCreatedAtMillis(order.createdAt) > lastCheck.timestamp,
+        // Only apply "new" filtering when lastCheck has been loaded.
+        new: lastCheck ? getCreatedAtMillis(order.createdAt) > lastCheck.timestamp : false,
         pending: order.status === "Pending",
         shipped: order.status === "Shipped"
       }[activeTab];
 
       return matchesSearch && matchesTab;
     });
-  }, [orders, searchTerm, activeTab, lastCheck.timestamp]);
+  }, [orders, searchTerm, activeTab, lastCheck]);
 
   // Calculate counts for all tabs
   const getTabCount = useCallback((tab) => {
@@ -139,14 +157,14 @@ export default function Orders() {
         order.userInfo?.phone?.includes(searchTerm);
 
       const matchesTab = {
-        new: getCreatedAtMillis(order.createdAt) > lastCheck.timestamp,
+        new: lastCheck ? getCreatedAtMillis(order.createdAt) > lastCheck.timestamp : false,
         pending: order.status === "Pending",
         shipped: order.status === "Shipped"
       }[tab];
 
       return matchesSearch && matchesTab;
     }).length;
-  }, [orders, searchTerm, lastCheck.timestamp]);
+  }, [orders, searchTerm, lastCheck]);
 
   // Update order status
   const updateOrderStatus = async (orderId, newStatus) => {
