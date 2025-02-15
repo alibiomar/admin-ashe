@@ -6,7 +6,6 @@ export default function Document() {
       <Head>
         {/* Default title for all pages */}
         <title>ASHE™ Admin</title>
-
         {/* PWA and SEO meta tags */}
         <link rel="manifest" href="/public/manifest.json" />
         <meta name="application-name" content="ASHE™ Admin" />
