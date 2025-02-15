@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from "react";
 import AdminLayout from "../../components/layout/AdminLayout";
 import AuthCheck from "../../components/auth/AuthCheck";
 import { db } from "../../lib/firebaseClient";
-import { collection, getDocs, doc, updateDoc } from "firebase/firestore";
+import { collection, onSnapshot, doc, updateDoc } from "firebase/firestore";
 import { FiPackage, FiTruck, FiClock, FiXCircle, FiCheckCircle, FiUser, FiPhone } from "react-icons/fi";
 
 export default function Orders() {
@@ -34,26 +34,29 @@ export default function Orders() {
     };
   }, [selectedOrder]);
 
-  // Fetch orders from Firestore
+  // Fetch orders from Firestore using onSnapshot for real-time updates
   useEffect(() => {
-    async function fetchOrders() {
-      try {
-        const ordersCollection = collection(db, "orders");
-        const ordersSnapshot = await getDocs(ordersCollection);
+    const ordersCollection = collection(db, "orders");
+
+    const unsubscribe = onSnapshot(
+      ordersCollection,
+      (ordersSnapshot) => {
         const ordersData = ordersSnapshot.docs.map((doc) => ({
           id: doc.id,
           ...doc.data(),
         }));
         setOrders(ordersData);
-      } catch (err) {
+        setLoading(false); // Set loading to false after data is fetched
+      },
+      (err) => {
         setError("Failed to fetch orders.");
         console.error("Error fetching orders:", err);
-      } finally {
-        setLoading(false);
+        setLoading(false); // Stop loading if an error occurs
       }
-    }
+    );
 
-    fetchOrders();
+    // Cleanup the listener when component unmounts
+    return () => unsubscribe();
   }, []);
 
   // Update order status
@@ -77,7 +80,7 @@ export default function Orders() {
   const shippedOrders = orders.filter((order) => order.status === "Shipped");
   const pendingOrders = orders.filter((order) => order.status === "Pending");
 
-  // Enhanced order card design
+  // Render Order Card
   const renderOrderCard = (order) => (
     <div
       key={order.id}
@@ -154,7 +157,7 @@ export default function Orders() {
     </div>
   );
 
-  // Enhanced modal design
+  // Modal for shipping information
   const renderShippingModal = () => (
     <div className="fixed inset-0 bg-black bg-opacity-30 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-scroll">
       <div
