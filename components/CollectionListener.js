@@ -2,7 +2,7 @@
 // components/CollectionListener.js
 import { useEffect, useCallback } from 'react';
 import { collection, onSnapshot } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import { db } from '../lib/firebaseClient';
 import { useServiceWorker } from '../hooks/useServiceWorker';
 import { useNotifications } from '../hooks/useNotifications';
 
