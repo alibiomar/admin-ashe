@@ -36,18 +36,6 @@
   "display_override": ["standalone", "fullscreen", "minimal-ui"],
   "gcm_sender_id": "797645105159",
   "notification": {
-    "actions": [
-      {
-        "action": "view",
-        "title": "View Order",
-        "icon": "/logo72.png"
-      },
-      {
-        "action": "dismiss",
-        "title": "Dismiss",
-        "icon": "/logo72.png"
-      }
-    ],
     "default_vibration_pattern": [200, 100, 200],
     "default_notification_icon": "/notif.png"
   },

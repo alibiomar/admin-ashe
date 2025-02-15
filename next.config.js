@@ -3,9 +3,6 @@ const withPWA = require("next-pwa");
 const isDev = process.env.NODE_ENV === "development";
 
 const nextConfig = {
-  devIndicators: {
-    buildActivity: false, // Keep this in the main Next.js config
-  },
   images: {
     remotePatterns: [
       {
@@ -33,17 +30,11 @@ const nextConfig = {
   poweredByHeader: false,
   reactStrictMode: true,
   productionBrowserSourceMaps: false,
-  buildExcludes: [/middleware-manifest\.json$/],
-exclude: [
-  /dynamic-css-manifest\.json$/,
-  /middleware-manifest\.json$/,
-  /middleware-runtime\.js$/
-],
+
 };
 
 module.exports = withPWA({
   disable: isDev, // Disable PWA in development mode
   dest: 'public', // Destination folder for PWA files
-  register: true,  // Automatically register the service worker
   sw: 'firebase-messaging-sw.js',   // Service worker file
 })(nextConfig);
