@@ -1,5 +1,4 @@
 const withPWA = require("next-pwa");
-
 const isDev = process.env.NODE_ENV === "development";
 
 const nextConfig = {
@@ -36,9 +35,10 @@ const nextConfig = {
 };
 
 module.exports = withPWA({
-  dest: "public",
-  register: true,
-  skipWaiting: false, // Prevents forced updates
-  buildExcludes: [/middleware-manifest.json$/, /_next\/dynamic-css-manifest.json$/],
-  disable: isDev, // ⬅️ Disable PWA in development mode
+  pwa: {
+    disable: isDev, // Disable PWA in development mode
+    dest: "public", // Destination folder for PWA files
+    register: true, // Automatically register the service worker
+    sw: "sw.js",    // Service worker file name
+  },
 })(nextConfig);
