@@ -1,53 +1,117 @@
-// sw.js (Enhanced Service Worker)
-import { precacheAndRoute } from 'workbox-precaching';
 import { clientsClaim } from 'workbox-core';
 
 // Take immediate control of the page
 clientsClaim();
+const CACHE_NAME = 'admin-dashboard-v1';
 
-// Precaching configuration
-precacheAndRoute(self.__WB_MANIFEST || []);
-precacheAndRoute([
-  { url: '/icons/order.png', revision: '1' }
-]);
+const urlsToCache = [
+  '/',
+  '/index.html',
+  '/notif.png',
+  '/logo192.png',
+  '/logo512.png',
+  '/manifest.json',
+  '/styles.css'  // Added from your second install event
+];
 
+// In service-worker.js
 self.addEventListener('install', (event) => {
-  self.skipWaiting();
-});
-
-self.addEventListener('activate', (event) => {
-  event.waitUntil(clients.claim());
-});
-
-self.addEventListener('message', (event) => {
-  if (event.data === 'SKIP_WAITING') {
-    self.skipWaiting();
-  }
-});
-
-self.addEventListener('push', (event) => {
   event.waitUntil(
-    (async () => {
-      const clients = await self.clients.matchAll({ type: 'window' });
-      if (clients.length > 0) {
-        clients[0].postMessage({
-          type: 'NEW_PUSH_NOTIFICATION',
-          payload: event.data.json()
-        });
-      }
-      return self.registration.showNotification(event.data.title, event.data.options);
-    })()
+    caches.open('my-cache').then(cache => {
+      return cache.addAll(urlsToCache); // Your critical assets
+    })
   );
 });
 
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
+    self.clients.claim().then(() => {
+      console.log('Service Worker activated and controlling clients');
+    })
+  );
+});
+// Fetch event with improved error handling
+self.addEventListener('fetch', (event) => {
+  event.respondWith(
+    caches.match(event.request)
+      .then((response) => {
+        if (response) {
+          return response;
+        }
+        
+        return fetch(event.request)
+          .then(response => {
+            // Don't cache if not a valid response
+            if (!response || response.status !== 200 || response.type !== 'basic') {
+              return response;
+            }
+
+            const responseToCache = response.clone();
+
+            // Wrap cache operations in event.waitUntil
+            event.waitUntil(
+              caches.open(CACHE_NAME)
+                .then(cache => {
+                  cache.put(event.request, responseToCache);
+                })
+                .catch(err => console.error('Cache put failed:', err))
+            );
+
+            return response;
+          })
+          .catch(error => {
+            console.error('Fetch failed:', error);
+            // Optionally return a custom offline page
+            // return caches.match('/offline.html');
+          });
+      })
+  );
+});
+
+// Notification click handler
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
+
   event.waitUntil(
-    clients.matchAll({ type: 'window' }).then((clientList) => {
-      if (clientList.length > 0) {
-        return clientList[0].focus();
+    self.clients.matchAll({
+      type: 'window',
+      includeUncontrolled: true
+    })
+    .then((clientList) => {
+      for (const client of clientList) {
+        if ('focus' in client) {
+          return client.focus();
+        }
       }
-      return clients.openWindow(event.notification.data.url);
+      return self.clients.openWindow('/');
+    })
+    .catch(err => console.error('Error handling notification click:', err))
+  );
+});
+
+// In your service-worker.js
+self.addEventListener('message', (event) => {
+  if (event.data.type === 'TRIGGER_NOTIFICATION') {
+    event.waitUntil(
+      self.registration.showNotification(
+        event.data.title,
+        event.data.options
+      ).then(() => {
+        // Send confirmation back to client
+        event.source.postMessage({
+          type: 'NOTIFICATION_CONFIRMED',
+          success: true
+        });
+      })
+    );
+  }
+});
+self.addEventListener('push', (event) => {
+  const data = event.data.json();
+  event.waitUntil(
+    self.registration.showNotification(data.title, {
+      body: data.body,
+      icon: '/icon.png'
     })
   );
 });

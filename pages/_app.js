@@ -3,87 +3,53 @@ import { useEffect, useState } from "react";
 import { AuthProvider } from "../contexts/authContext";
 import NotificationPermission from "../components/NotificationPermission";
 import CollectionListener from "../components/CollectionListener";
+import { registerServiceWorker } from "../lib/serviceWorkerUtils";
 import "../styles/globals.css";
 
 function MyApp({ Component, pageProps }) {
   const [showPermission, setShowPermission] = useState(false);
   const [swRegistration, setSwRegistration] = useState(null);
+  const [isSwReady, setIsSwReady] = useState(false);
 
   // Service Worker registration and management
   useEffect(() => {
-    const registerServiceWorker = async () => {
-      if (!("serviceWorker" in navigator)) {
-        console.log("❌ Service Workers not supported");
-        return;
-      }
-
+    const initServiceWorker = async () => {
       try {
-        // Check for existing registration
-        const existingReg = await navigator.serviceWorker.getRegistration();
-        
-        if (existingReg) {
-          console.log("🔄 Using existing SW:", existingReg);
-          setSwRegistration(existingReg);
+        const registration = await registerServiceWorker();
+        if (registration) {
+          setSwRegistration(registration);
           
-          if (existingReg.active) {
-            console.log("✅ Service Worker is already active");
-          }
-          
-          // Monitor state changes for existing registration
-          existingReg.addEventListener("statechange", (event) => {
+          // Handle Service Worker state changes
+          const handleStateChange = (event) => {
             console.log(`Service Worker state changed to: ${event.target.state}`);
             if (event.target.state === "activated") {
               console.log("🚀 Service Worker activated!");
+              setIsSwReady(true);
             }
-          });
-          
-        } else {
-          // Register new Service Worker
-          const newRegistration = await navigator.serviceWorker.register("/sw.js", {
-            scope: "/"
-          });
-          
-          console.log("✅ SW Registered:", newRegistration);
-          setSwRegistration(newRegistration);
+          };
 
-          // Monitor state changes for new registration
-          newRegistration.addEventListener("statechange", (event) => {
-            console.log(`Service Worker state changed to: ${event.target.state}`);
-            if (event.target.state === "activated") {
-              console.log("🚀 Service Worker activated!");
-            }
-          });
+          registration.addEventListener("statechange", handleStateChange);
+
+          // Cleanup listener
+          return () => {
+            registration.removeEventListener("statechange", handleStateChange);
+          };
         }
-
       } catch (error) {
-        console.error("❌ SW Registration Failed:", error);
+        console.error("❌ Service Worker initialization failed:", error);
       }
     };
 
-    registerServiceWorker();
-
-    // Cleanup function
-    return () => {
-      if (swRegistration) {
-        // Remove event listeners if needed
-        swRegistration.removeEventListener("statechange", () => {});
-      }
-    };
+    initServiceWorker();
   }, []);
 
-  // Notification permission management
+  // Notification permission management with user interaction
   useEffect(() => {
-    let interactionTimeout;
-    let isSubscribed = false;
-
     const handleUserInteraction = () => {
-      if (isSubscribed) return;
-      
-      interactionTimeout = setTimeout(() => {
+      if (Notification.permission === "default") {
         setShowPermission(true);
         removeEventListeners();
-        isSubscribed = true;
-      }, 1000);
+      }
     };
 
     const removeEventListeners = () => {
@@ -92,19 +58,16 @@ function MyApp({ Component, pageProps }) {
       window.removeEventListener("keydown", handleUserInteraction);
     };
 
-    // Add event listeners
-    window.addEventListener("click", handleUserInteraction);
-    window.addEventListener("scroll", handleUserInteraction);
-    window.addEventListener("keydown", handleUserInteraction);
+    // Add event listeners with debounce
+    const debouncedInteraction = debounce(handleUserInteraction, 1000);
+    window.addEventListener("click", debouncedInteraction);
+    window.addEventListener("scroll", debouncedInteraction);
+    window.addEventListener("keydown", debouncedInteraction);
 
-    // Cleanup function
-    return () => {
-      clearTimeout(interactionTimeout);
-      removeEventListeners();
-    };
+    return removeEventListeners;
   }, []);
 
-  // Optional: Add error boundary
+  // Error boundary and monitoring
   useEffect(() => {
     const handleError = (error) => {
       console.error("Application Error:", error);
@@ -118,10 +81,21 @@ function MyApp({ Component, pageProps }) {
   return (
     <AuthProvider>
       {showPermission && <NotificationPermission />}
-      {swRegistration && <CollectionListener swRegistration={swRegistration} />}
+      {isSwReady && swRegistration && (
+        <CollectionListener swRegistration={swRegistration} />
+      )}
       <Component {...pageProps} />
     </AuthProvider>
   );
+}
+
+// Utility function for debouncing
+function debounce(func, wait) {
+  let timeout;
+  return function(...args) {
+    clearTimeout(timeout);
+    timeout = setTimeout(() => func.apply(this, args), wait);
+  };
 }
 
 export default MyApp;
