@@ -2,16 +2,30 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import AdminLayout from "../../components/layout/AdminLayout";
 import AuthCheck from "../../components/auth/AuthCheck";
 import { db } from "../../lib/firebaseClient";
-import { 
-  collection, onSnapshot, doc, updateDoc, query, orderBy, setDoc, getDoc 
+import {
+  collection,
+  onSnapshot,
+  doc,
+  updateDoc,
+  query,
+  orderBy,
+  setDoc,
+  getDoc,
 } from "firebase/firestore";
-import { 
-  FiPackage, FiTruck, FiClock, FiXCircle, FiCheckCircle, FiUser, FiPhone, FiSearch 
+import {
+  FiPackage,
+  FiTruck,
+  FiClock,
+  FiXCircle,
+  FiCheckCircle,
+  FiUser,
+  FiPhone,
+  FiSearch,
 } from "react-icons/fi";
 
 // Helper function to safely convert createdAt to milliseconds
 const getCreatedAtMillis = (createdAt) => {
-  if (createdAt && typeof createdAt.toMillis === 'function') {
+  if (createdAt && typeof createdAt.toMillis === "function") {
     return createdAt.toMillis();
   } else if (createdAt instanceof Date) {
     return createdAt.getTime();
@@ -55,7 +69,7 @@ export default function Orders() {
           // Create the document if it doesn't exist
           const initialData = {
             timestamp: Date.now(),
-            orderCount: 0
+            orderCount: 0,
           };
           await setDoc(docRef, initialData);
           setLastCheck(initialData);
@@ -75,7 +89,7 @@ export default function Orders() {
         try {
           await setDoc(doc(db, "LastOrderCheck", "admin"), {
             timestamp: Date.now(),
-            orderCount: orders.length
+            orderCount: orders.length,
           });
         } catch (err) {
           console.error("Failed to update last check:", err);
@@ -138,10 +152,12 @@ export default function Orders() {
         order.userInfo?.phone?.includes(searchTerm);
 
       const matchesTab = {
-        // Only apply "new" filtering when lastCheck has been loaded.
-        new: lastCheck ? getCreatedAtMillis(order.createdAt) > lastCheck.timestamp : false,
+        // For "new" tab: show if order.status is "New" OR its creation time is later than lastCheck.timestamp.
+        new: lastCheck
+          ? (order.status === "New" || getCreatedAtMillis(order.createdAt) > lastCheck.timestamp)
+          : false,
         pending: order.status === "Pending",
-        shipped: order.status === "Shipped"
+        shipped: order.status === "Shipped",
       }[activeTab];
 
       return matchesSearch && matchesTab;
@@ -157,9 +173,11 @@ export default function Orders() {
         order.userInfo?.phone?.includes(searchTerm);
 
       const matchesTab = {
-        new: lastCheck ? getCreatedAtMillis(order.createdAt) > lastCheck.timestamp : false,
+        new: lastCheck
+          ? (order.status === "New" || getCreatedAtMillis(order.createdAt) > lastCheck.timestamp)
+          : false,
         pending: order.status === "Pending",
-        shipped: order.status === "Shipped"
+        shipped: order.status === "Shipped",
       }[tab];
 
       return matchesSearch && matchesTab;
