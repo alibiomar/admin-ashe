@@ -5,7 +5,7 @@ import NotificationPermission from "../components/NotificationPermission";
 import CollectionListener from "../components/CollectionListener";
 import { registerServiceWorker } from "../lib/serviceWorkerUtils";
 import "../styles/globals.css";
-$
+
 function MyApp({ Component, pageProps }) {
   const [showPermission, setShowPermission] = useState(false);
   const [swRegistration, setSwRegistration] = useState(null);
