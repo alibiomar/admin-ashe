@@ -54,9 +54,6 @@
   "dir": "ltr",
   "lang": "en",
   "display_mode": "standalone",
-  "launch_handler": {
-    "client_mode": ["focus-existing", "auto"]
-  },
   "offline_enabled": true
 
 }
