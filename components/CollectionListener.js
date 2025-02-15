@@ -1,126 +1,205 @@
-import { useEffect, useCallback } from "react";
+import { useEffect, useCallback, useState } from "react";
 import { collection, onSnapshot } from "firebase/firestore";
 import { db } from "../lib/firebaseClient";
 
-export default function CollectionListener({ swRegistration }) {
-  // Handle notification trigger
-  const triggerNotification = useCallback(async (orderData) => {
-    if (!navigator.serviceWorker.controller) {
-      console.warn("⚠️ No active service worker controller");
-      return false;
+// Configuration constants
+const CONFIG = {
+  notifications: {
+    maxRetries: 3,
+    retryDelay: 2000,
+    backoffFactor: 1.5,
+  },
+  reconnect: {
+    maxAttempts: 5,
+    initialDelay: 1000,
+    maxDelay: 30000,
+  }
+};
+
+// Custom hook for Service Worker state management
+const useServiceWorker = (swRegistration) => {
+  const [status, setStatus] = useState({
+    isReady: false,
+    error: null,
+    permission: Notification.permission,
+  });
+
+  useEffect(() => {
+    if (!swRegistration) return;
+
+    const checkSWReadiness = async () => {
+      try {
+        const registration = await navigator.serviceWorker.ready;
+        setStatus(prev => ({
+          ...prev,
+          isReady: !!registration.active,
+          error: null,
+        }));
+      } catch (error) {
+        setStatus(prev => ({
+          ...prev,
+          isReady: false,
+          error: error.message,
+        }));
+      }
+    };
+
+    checkSWReadiness();
+    navigator.serviceWorker.addEventListener("controllerchange", checkSWReadiness);
+    
+    return () => {
+      navigator.serviceWorker.removeEventListener("controllerchange", checkSWReadiness);
+    };
+  }, [swRegistration]);
+
+  return status;
+};
+
+// Custom hook for notification handling
+const useNotifications = (swStatus) => {
+  const sendNotification = useCallback(async (orderData, attempt = 1) => {
+    if (!swStatus.isReady) {
+      throw new Error("Service Worker not ready for notifications");
     }
 
     try {
-      navigator.serviceWorker.controller.postMessage({
+      const controller = navigator.serviceWorker.controller;
+      if (!controller) {
+        throw new Error("No active Service Worker controller");
+      }
+
+      await controller.postMessage({
         type: "TRIGGER_NOTIFICATION",
         title: "New Order Received!",
         options: {
-          body: `Order from ${orderData.customerName || "Unknown"}`,
+          body: `Order #${orderData.id} from ${orderData.customerName || "Unknown"}`,
           icon: "/notif.png",
-          badge: "/notif.png",
-          data: { url: "/orders" },
-          tag: `order-${orderData.id}`, // Prevent duplicate notifications
-          timestamp: Date.now(), // For ordering notifications
-          requireInteraction: true, // Keep notification until user interacts
+          badge: "/badge.png", // Added badge for better mobile visibility
+          data: { 
+            url: `/orders/${orderData.id}`,
+            orderId: orderData.id,
+            timestamp: Date.now()
+          },
+          tag: `order-${orderData.id}`,
+          requireInteraction: true, // Ensures notification stays until user interacts
           actions: [
-            {
-              action: 'view',
-              title: 'View Order'
-            }
-          ]
+            { action: 'view', title: 'View Order' },
+            { action: 'dismiss', title: 'Dismiss' }
+          ],
+          vibrate: [200, 100, 200], // Haptic feedback pattern
         },
       });
-      console.log("✅ Notification message sent to service worker");
+
       return true;
     } catch (error) {
-      console.error("❌ Failed to send notification:", error);
-      return false;
-    }
-  }, []);
-
-  // Set up Firestore listener
-  useEffect(() => {
-    // Validate prerequisites
-    if (!swRegistration) {
-      console.warn("⚠️ No service worker registration available");
-      return;
-    }
-
-    if (Notification.permission !== "granted") {
-      console.warn("⚠️ Notification permission not granted");
-      return;
-    }
-
-    if (!db) {
-      console.error("❌ Firestore database instance not available");
-      return;
-    }
-
-    console.log("🔵 Starting Firestore listener...");
-
-    let isSubscribed = true;
-    const collectionRef = collection(db, "orders");
-
-    // Set up snapshot listener with error handling
-    const unsubscribe = onSnapshot(
-      collectionRef,
-      async (snapshot) => {
-        if (!isSubscribed) return;
-
-        console.log(`📥 Received Firestore snapshot with ${snapshot.docs.length} docs`);
-
-        // Process document changes
-        const changes = snapshot.docChanges();
+      if (attempt <= CONFIG.notifications.maxRetries) {
+        const delay = CONFIG.notifications.retryDelay * 
+          Math.pow(CONFIG.notifications.backoffFactor, attempt - 1);
         
-        for (const change of changes) {
-          if (change.type === "added") {
-            const orderData = {
-              id: change.doc.id,
-              ...change.doc.data()
-            };
+        await new Promise(resolve => setTimeout(resolve, delay));
+        return sendNotification(orderData, attempt + 1);
+      }
+      throw error;
+    }
+  }, [swStatus.isReady]);
 
-            console.log("📦 New order detected:", orderData);
+  return { sendNotification };
+};
 
-            // Attempt to send notification with retry
-            let notificationSent = false;
-            for (let attempt = 1; attempt <= 3 && !notificationSent; attempt++) {
-              if (attempt > 1) {
-                console.log(`Retrying notification (attempt ${attempt}/3)...`);
-                await new Promise(resolve => setTimeout(resolve, 1000));
-              }
-              notificationSent = await triggerNotification(orderData);
-            }
+// Custom hook for Firestore listener
+const useFirestoreListener = (collectionName, onNewDocument) => {
+  useEffect(() => {
+    let isMounted = true;
+    let retryCount = 0;
+    let retryTimeout;
 
-            if (!notificationSent) {
-              console.error("❌ Failed to send notification after all retries");
+    const setupListener = async () => {
+      try {
+        const collectionRef = collection(db, collectionName);
+        
+        return onSnapshot(
+          collectionRef,
+          async (snapshot) => {
+            if (!isMounted) return;
+            retryCount = 0; // Reset retry count on successful connection
+
+            const changes = snapshot.docChanges();
+            await Promise.all(
+              changes
+                .filter(change => change.type === "added")
+                .map(async (change) => {
+                  const data = { id: change.doc.id, ...change.doc.data() };
+                  await onNewDocument(data);
+                })
+            );
+          },
+          async (error) => {
+            console.error("Firestore connection error:", error);
+            
+            if (!isMounted) return;
+            
+            // Implement exponential backoff for reconnection
+            if (retryCount < CONFIG.reconnect.maxAttempts) {
+              const delay = Math.min(
+                CONFIG.reconnect.initialDelay * Math.pow(2, retryCount),
+                CONFIG.reconnect.maxDelay
+              );
+              
+              retryCount++;
+              retryTimeout = setTimeout(setupListener, delay);
             }
           }
-        }
-      },
-      (error) => {
-        console.error("❌ Firestore listener error:", error);
-        // Optionally implement retry logic here
+        );
+      } catch (error) {
+        console.error("Failed to setup Firestore listener:", error);
+        throw error;
       }
-    );
+    };
 
-    // Cleanup function
+    let unsubscribe = setupListener();
+
     return () => {
-      isSubscribed = false;
-      unsubscribe();
-      console.log("🔴 Firestore listener stopped");
+      isMounted = false;
+      clearTimeout(retryTimeout);
+      if (unsubscribe) {
+        unsubscribe();
+      }
     };
-  }, [swRegistration, triggerNotification]);
+  }, [collectionName, onNewDocument]);
+};
 
-  // Optional: Add error boundary
+export default function CollectionListener({ swRegistration }) {
+  const swStatus = useServiceWorker(swRegistration);
+  const { sendNotification } = useNotifications(swStatus);
+  
+  const handleNewOrder = useCallback(async (orderData) => {
+    try {
+      await sendNotification(orderData);
+      console.log(`✅ Notification sent for order ${orderData.id}`);
+    } catch (error) {
+      console.error(`❌ Failed to send notification for order ${orderData.id}:`, error);
+    }
+  }, [sendNotification]);
+
+  useFirestoreListener("orders", handleNewOrder);
+
+  // Service Worker message handler
   useEffect(() => {
-    const handleError = (error) => {
-      console.error("CollectionListener Error:", error);
-      // Implement error reporting as needed
+    if (!swStatus.isReady) return;
+
+    const messageHandler = (event) => {
+      const { type, orderId, action } = event.data;
+      if (type === "NOTIFICATION_ACTION") {
+        console.log(`User ${action}ed notification for order ${orderId}`);
+        // Handle different notification actions here
+      }
     };
 
-    window.addEventListener("error", handleError);
-    return () => window.removeEventListener("error", handleError);
-  }, []);
+    navigator.serviceWorker.addEventListener("message", messageHandler);
+    return () => {
+      navigator.serviceWorker.removeEventListener("message", messageHandler);
+    };
+  }, [swStatus.isReady]);
 
   return null;
 }

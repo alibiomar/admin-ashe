@@ -85,19 +85,20 @@ self.addEventListener('notificationclick', (event) => {
   );
 });
 
-// Message handler
-self.addEventListener("message", (event) => {
-  if (event.data?.type === "TRIGGER_NOTIFICATION") {
-    const { title, options } = event.data;
-
+// In your service-worker.js
+self.addEventListener('message', (event) => {
+  if (event.data.type === 'TRIGGER_NOTIFICATION') {
     event.waitUntil(
-      self.registration.showNotification(title, {
-        ...options,
-        requireInteraction: true,
-        renotify: true,
-        badge: "/notif.png",
-        icon: "/notif.png",
-      }).catch(err => console.error("Error showing notification:", err))
+      self.registration.showNotification(
+        event.data.title,
+        event.data.options
+      ).then(() => {
+        // Send confirmation back to client
+        event.source.postMessage({
+          type: 'NOTIFICATION_CONFIRMED',
+          success: true
+        });
+      })
     );
   }
 });
