@@ -27,3 +27,11 @@ yarn-error.log*
 .vercel
 serviceAccountKey.json
 .next
+
+# PWA files
+sw.js
+workbox-*.js
+worker-*.js
+sw.js.map
+workbox-*.js.map
+worker-*.js.map
