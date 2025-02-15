@@ -13,11 +13,28 @@ function MyApp({ Component, pageProps }) {
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker.getRegistration().then((existingReg) => {
         if (!existingReg) {
-          navigator.serviceWorker.register("/sw.js")
-            .then((reg) => console.log("✅ Service Worker Registered:", reg))
+          navigator.serviceWorker
+            .register("/sw.js")
+            .then((reg) => {
+              console.log("✅ SW Registered:", reg);
+              reg.addEventListener("statechange", (event) => {
+                if (event.target.state === "activated") {
+                  console.log("Service Worker activated!");
+                }
+              });
+            })
             .catch((err) => console.error("❌ SW Registration Failed:", err));
         } else {
-          console.log("🔄 Using existing service worker:", existingReg);
+          console.log("🔄 Using existing SW:", existingReg);
+          if (existingReg.active) {
+            console.log("Service Worker is already active.");
+          } else {
+            existingReg.addEventListener("statechange", (event) => {
+              if (event.target.state === "activated") {
+                console.log("Service Worker activated!");
+              }
+            });
+          }
         }
       });
     }
