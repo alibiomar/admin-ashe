@@ -5,52 +5,16 @@ import { db } from '../lib/firebaseClient';
 import { useNotifications } from '../hooks/useNotifications';
 
 export default function CollectionListener({ swRegistration }) {
-  const { sendNotification, requestPermission } = useNotifications(swRegistration);
+  const { sendNotification} = useNotifications(swRegistration);
   const [isListening, setIsListening] = useState(false);
-  const [isSwReady, setIsSwReady] = useState(false); // Track SW readiness
   const [retryCount, setRetryCount] = useState(0); // Retry count for Firestore listener
 
-  // Initialize service worker and check readiness
-  const initServiceWorker = async () => {
-    if ('serviceWorker' in navigator) {
-      try {
-        const registration = await navigator.serviceWorker.register('/sw.js');
-        console.log('Service Worker registered:', registration);
-        setIsSwReady(true); // Set service worker as ready
-      } catch (error) {
-        console.error('Service worker registration failed:', error);
-      }
-    }
-  };
-
-  useEffect(() => {
-    initServiceWorker(); // Register service worker on component mount
-  }, []);
-
-  // Request notification permission once the service worker is ready
-  useEffect(() => {
-    if (isSwReady) {
-      requestPermission(); // Request permission for notifications
-    }
-  }, [isSwReady, requestPermission]);
-
-  // Enhanced notification handler for new orders
   const handleNewOrder = useCallback(async (orderData) => {
     try {
       await sendNotification({
-        title: 'New Order Received',
-        body: `Order #${orderData.id} - ${orderData.total}€`,
-        icon: '/icons/order.png',
-        data: { url: `/orders/${orderData.id}` },
-        vibrate: [200, 100, 200],
-        actions: [
-          { action: 'view', title: 'View Order' },
-          { action: 'dismiss', title: 'Dismiss' }
-        ]
-      }, {
-        retries: 5,
-        retryDelay: 1000,
-        backoffFactor: 2
+        title: 'New order received!',
+        body: `Order ID: ${orderData.id}`,
+        data: { orderId: orderData.id },
       });
     } catch (error) {
       console.error('Notification failed after retries:', error);
