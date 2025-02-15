@@ -11,33 +11,18 @@ function MyApp({ Component, pageProps }) {
 
   useEffect(() => {
     if ("serviceWorker" in navigator) {
-      const registerSW = async () => {
-        try {
-          const registration = await navigator.serviceWorker.register("/sw.js");
-
-          // If the service worker is already active, set it immediately
-          if (registration.active) {
-            setSwRegistration(registration);
-          }
-
-          registration.addEventListener("updatefound", () => {
-            const newWorker = registration.installing;
-            if (newWorker) {
-              newWorker.addEventListener("statechange", () => {
-                if (newWorker.state === "activated") {
-                  setSwRegistration(registration);
-                }
-              });
-            }
-          });
-        } catch (err) {
-          console.error("Service Worker Registration Failed:", err);
+      navigator.serviceWorker.getRegistration().then((existingReg) => {
+        if (!existingReg) {
+          navigator.serviceWorker.register("/sw.js")
+            .then((reg) => console.log("✅ Service Worker Registered:", reg))
+            .catch((err) => console.error("❌ SW Registration Failed:", err));
+        } else {
+          console.log("🔄 Using existing service worker:", existingReg);
         }
-      };
-
-      registerSW();
+      });
     }
   }, []);
+  
 
   // Delay showing the notification permission request until user interaction
   useEffect(() => {

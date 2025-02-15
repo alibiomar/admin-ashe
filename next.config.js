@@ -38,6 +38,7 @@ const nextConfig = {
 module.exports = withPWA({
   dest: "public",
   register: true,
-  skipWaiting: true,
+  skipWaiting: false, // Prevents forced updates
+  buildExcludes: [/middleware-manifest.json$/, /_next\/dynamic-css-manifest.json$/],
   disable: isDev, // ⬅️ Disable PWA in development mode
 })(nextConfig);
