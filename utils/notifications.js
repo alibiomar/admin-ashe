@@ -1,4 +1,4 @@
-import { messaging, db } from '../lib/firebase';
+import { messaging, db } from '../lib/firebaseClient';
 import { getToken } from 'firebase/messaging';
 import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
 
