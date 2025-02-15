@@ -10,35 +10,22 @@ const urlsToCache = [
   '/styles.css'  // Added from your second install event
 ];
 
-// Install event - Remove duplicate install listener
+// In service-worker.js
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then((cache) => {
-        console.log('Opened cache');
-        return cache.addAll(urlsToCache)
-          .catch((err) => console.error('Cache installation failed:', err));
-      })
-  );
-  self.skipWaiting();
-});
-
-// Activate event
-self.addEventListener('activate', (event) => {
-  event.waitUntil(
-    caches.keys().then((cacheNames) => {
-      return Promise.all(
-        cacheNames.map((cacheName) => {
-          if (cacheName !== CACHE_NAME) {
-            return caches.delete(cacheName);
-          }
-        })
-      );
+    caches.open('my-cache').then(cache => {
+      return cache.addAll(urlsToCache); // Your critical assets
     })
   );
-  self.clients.claim();
 });
 
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
+    self.clients.claim().then(() => {
+      console.log('Service Worker activated and controlling clients');
+    })
+  );
+});
 // Fetch event with improved error handling
 self.addEventListener('fetch', (event) => {
   event.respondWith(
@@ -113,4 +100,13 @@ self.addEventListener("message", (event) => {
       }).catch(err => console.error("Error showing notification:", err))
     );
   }
+});
+self.addEventListener('push', (event) => {
+  const data = event.data.json();
+  event.waitUntil(
+    self.registration.showNotification(data.title, {
+      body: data.body,
+      icon: '/icon.png'
+    })
+  );
 });
