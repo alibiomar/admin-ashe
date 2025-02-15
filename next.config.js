@@ -33,6 +33,12 @@ const nextConfig = {
   poweredByHeader: false,
   reactStrictMode: true,
   productionBrowserSourceMaps: false,
+  buildExcludes: [/middleware-manifest\.json$/],
+exclude: [
+  /dynamic-css-manifest\.json$/,
+  /middleware-manifest\.json$/,
+  /middleware-runtime\.js$/
+],
 };
 
 module.exports = withPWA({
