@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react';
 import { onMessage, getToken } from 'firebase/messaging';
-import { messaging, db, auth } from '../lib/firebase';
+import { messaging, db, auth } from '../lib/firebaseClient';
 import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
 
