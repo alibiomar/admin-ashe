@@ -1,17 +1,8 @@
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useEffect, useState, useCallback } from "react";
 import AdminLayout from "../../components/layout/AdminLayout";
 import AuthCheck from "../../components/auth/AuthCheck";
 import { db } from "../../lib/firebaseClient";
-import {
-  collection,
-  onSnapshot,
-  doc,
-  updateDoc,
-  query,
-  orderBy,
-  setDoc,
-  getDoc,
-} from "firebase/firestore";
+import { collection, doc, updateDoc, query, orderBy, getDocs } from "firebase/firestore";
 import {
   FiPackage,
   FiTruck,
@@ -23,15 +14,10 @@ import {
   FiSearch,
 } from "react-icons/fi";
 
-// Helper function to safely convert createdAt to milliseconds
 const getCreatedAtMillis = (createdAt) => {
-  if (createdAt && typeof createdAt.toMillis === "function") {
-    return createdAt.toMillis();
-  } else if (createdAt instanceof Date) {
-    return createdAt.getTime();
-  } else {
-    return createdAt || 0;
-  }
+  if (createdAt?.toMillis) return createdAt.toMillis();
+  if (createdAt instanceof Date) return createdAt.getTime();
+  return createdAt || 0;
 };
 
 export default function Orders() {
@@ -39,111 +25,36 @@ export default function Orders() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedOrder, setSelectedOrder] = useState(null);
-  const [activeTab, setActiveTab] = useState("new"); // Default to "new" tab
+  const [activeTab, setActiveTab] = useState("new");
   const [searchTerm, setSearchTerm] = useState("");
   const [sortOrder, setSortOrder] = useState("desc");
-  // Initialize lastCheck as null so we know when it’s loaded
-  const [lastCheck, setLastCheck] = useState(null);
 
-  const modalRef = useRef(null);
-  // Ref to skip notifications on initial load
-  const isInitialLoad = useRef(true);
-
-  // (Optional) Request Notification permission once on mount
+  // Fetch orders on initial load
   useEffect(() => {
-    if (Notification.permission !== "granted") {
-      Notification.requestPermission();
-    }
-  }, []);
-
-  // Fetch last check data from Firestore
-  useEffect(() => {
-    const fetchLastCheck = async () => {
+    const fetchOrders = async () => {
       try {
-        const docRef = doc(db, "LastOrderCheck", "admin");
-        const docSnap = await getDoc(docRef);
+        const ordersCollection = collection(db, "orders");
+        const ordersQuery = query(ordersCollection, orderBy("createdAt", sortOrder));
+        const snapshot = await getDocs(ordersQuery);
 
-        if (docSnap.exists()) {
-          setLastCheck(docSnap.data());
-        } else {
-          // Create the document if it doesn't exist
-          const initialData = {
-            timestamp: Date.now(),
-            orderCount: 0,
-          };
-          await setDoc(docRef, initialData);
-          setLastCheck(initialData);
-        }
-      } catch (err) {
-        setError("Failed to load last check: " + err.message);
-      }
-    };
-
-    fetchLastCheck();
-  }, []);
-
-  // Save last check data on unmount
-  useEffect(() => {
-    return () => {
-      const updateLastCheck = async () => {
-        try {
-          await setDoc(doc(db, "LastOrderCheck", "admin"), {
-            timestamp: Date.now(),
-            orderCount: orders.length,
-          });
-        } catch (err) {
-          console.error("Failed to update last check:", err);
-        }
-      };
-
-      updateLastCheck();
-    };
-  }, [orders.length]);
-
-  // Fetch orders from Firestore
-  useEffect(() => {
-    const ordersCollection = collection(db, "orders");
-    const ordersQuery = query(ordersCollection, orderBy("createdAt", sortOrder));
-
-    const unsubscribe = onSnapshot(
-      ordersQuery,
-      (ordersSnapshot) => {
-        const ordersData = ordersSnapshot.docs.map((doc) => ({
+        const ordersData = snapshot.docs.map((doc) => ({
           id: doc.id,
           ...doc.data(),
           createdAt: doc.data().createdAt,
         }));
 
-        // Only show notifications for orders added after the initial load
-        if (!isInitialLoad.current && Notification.permission === "granted") {
-          ordersSnapshot.docChanges().forEach((change) => {
-            if (change.type === "added") {
-              const newOrder = change.doc.data();
-              new Notification("New Order Received!", {
-                body: `Order #${change.doc.id.slice(0, 8)} - ${newOrder.userInfo?.name || "Unknown Customer"}`,
-                icon: "/notif.jpg",
-              });
-            }
-          });
-        }
-        // Mark initial load as done after the first snapshot
-        if (isInitialLoad.current) {
-          isInitialLoad.current = false;
-        }
-
         setOrders(ordersData);
         setLoading(false);
-      },
-      (err) => {
+      } catch (err) {
         setError("Failed to fetch orders: " + err.message);
-        console.error("Error fetching orders:", err);
+        setLoading(false);
       }
-    );
+    };
 
-    return () => unsubscribe();
+    fetchOrders();
   }, [sortOrder]);
 
-  // Filter orders based on search term, active tab, and last viewed timestamp
+  // Filter orders based on search and tab
   const filteredOrders = useCallback(() => {
     return orders.filter((order) => {
       const matchesSearch =
@@ -152,46 +63,29 @@ export default function Orders() {
         order.userInfo?.phone?.includes(searchTerm);
 
       const matchesTab = {
-        // For "new" tab: show if order.status is "New" OR its creation time is later than lastCheck.timestamp.
-        new: lastCheck
-          ? (order.status === "New" || getCreatedAtMillis(order.createdAt) > lastCheck.timestamp)
-          : false,
+        new: order.status === "New",
         pending: order.status === "Pending",
         shipped: order.status === "Shipped",
       }[activeTab];
 
       return matchesSearch && matchesTab;
     });
-  }, [orders, searchTerm, activeTab, lastCheck]);
-
-  // Calculate counts for all tabs
-  const getTabCount = useCallback((tab) => {
-    return orders.filter((order) => {
-      const matchesSearch =
-        order.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        order.userInfo?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        order.userInfo?.phone?.includes(searchTerm);
-
-      const matchesTab = {
-        new: lastCheck
-          ? (order.status === "New" || getCreatedAtMillis(order.createdAt) > lastCheck.timestamp)
-          : false,
-        pending: order.status === "Pending",
-        shipped: order.status === "Shipped",
-      }[tab];
-
-      return matchesSearch && matchesTab;
-    }).length;
-  }, [orders, searchTerm, lastCheck]);
+  }, [orders, searchTerm, activeTab]);
 
   // Update order status
   const updateOrderStatus = async (orderId, newStatus) => {
     try {
       const orderRef = doc(db, "orders", orderId);
       await updateDoc(orderRef, { status: newStatus });
+
+      // Refresh orders after update
+      setOrders((prev) =>
+        prev.map((order) =>
+          order.id === orderId ? { ...order, status: newStatus } : order
+        )
+      );
     } catch (err) {
       setError("Failed to update order status: " + err.message);
-      console.error("Error updating order status:", err);
     }
   };
 
@@ -314,106 +208,6 @@ export default function Orders() {
     </div>
   );
 
-  // Render shipping modal
-  const renderShippingModal = () => (
-    <div className="fixed inset-0 bg-black bg-opacity-30 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-scroll">
-      <div
-        ref={modalRef}
-        className="bg-white rounded-2xl p-8 max-w-2xl w-full space-y-6 shadow-xl"
-      >
-        <div className="flex justify-between items-start">
-          <h3 className="text-2xl font-bold flex items-center gap-2">
-            <FiPackage className="text-[#46c7c7]" />
-            Order Details
-          </h3>
-          <button
-            onClick={() => setSelectedOrder(null)}
-            className="p-2 hover:bg-gray-100 rounded-full"
-          >
-            <FiXCircle className="text-gray-500 text-xl" />
-          </button>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="space-y-4">
-            <div className="bg-gray-50 p-4 rounded-xl">
-              <h4 className="font-medium mb-3 flex items-center gap-2">
-                <FiUser className="text-[#46c7c7]" />
-                Client Information
-              </h4>
-              <div className="space-y-2 text-sm">
-                <p>
-                  <span className="font-medium">Name:</span>{" "}
-                  {selectedOrder.userInfo?.name || "N/A"}
-                </p>
-                <p>
-                  <span className="font-medium">Email:</span>{" "}
-                  {selectedOrder.userInfo?.email || "N/A"}
-                </p>
-                <p>
-                  <span className="font-medium">Phone:</span>{" "}
-                  {selectedOrder.userInfo?.phone || "N/A"}
-                </p>
-              </div>
-            </div>
-            <div className="bg-gray-50 p-4 rounded-xl">
-              <h4 className="font-medium mb-3 flex items-center gap-2">
-                <FiTruck className="text-[#46c7c7]" />
-                Shipping Information
-              </h4>
-              {selectedOrder.shippingInfo ? (
-                <div className="space-y-2 text-sm">
-                  <p>{selectedOrder.shippingInfo.addressLine}</p>
-                  <p>
-                    {selectedOrder.shippingInfo.city},{" "}
-                    {selectedOrder.shippingInfo.state}
-                  </p>
-                  <p>{selectedOrder.shippingInfo.zipCode}</p>
-                </div>
-              ) : (
-                <p className="text-gray-400">No shipping information</p>
-              )}
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            <div className="bg-gray-50 p-4 rounded-xl">
-              <h4 className="font-medium mb-3 flex items-center gap-2">
-                <FiPackage className="text-[#46c7c7]" />
-                Order Items ({selectedOrder.items?.length})
-              </h4>
-              <div className="space-y-3">
-                {selectedOrder.items?.map((item, index) => (
-                  <div
-                    key={index}
-                    className="flex justify-between items-center bg-white p-3 rounded-lg"
-                  >
-                    <div>
-                      <p className="font-medium">{item.name}</p>
-                      <p className="text-xs text-gray-500">
-                        Size: {item.size || "N/A"}
-                      </p>
-                    </div>
-                    <span className="font-medium">
-                      TND {item.price?.toFixed(2)}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="pt-4 border-t border-gray-200 text-sm text-gray-500">
-          <p>
-            Ordered on:{" "}
-            {new Date(getCreatedAtMillis(selectedOrder.createdAt)).toLocaleString()}
-          </p>
-        </div>
-      </div>
-    </div>
-  );
-
   return (
     <AuthCheck>
       <AdminLayout>
@@ -430,7 +224,7 @@ export default function Orders() {
                     : "text-gray-500 hover:bg-gray-50"
                 }`}
               >
-                {tab.charAt(0).toUpperCase() + tab.slice(1)} ({getTabCount(tab)})
+                {tab.charAt(0).toUpperCase() + tab.slice(1)}
               </button>
             ))}
           </div>
@@ -453,8 +247,6 @@ export default function Orders() {
             {filteredOrders().map(renderOrderCard)}
           </div>
         )}
-
-        {selectedOrder && renderShippingModal()}
       </AdminLayout>
     </AuthCheck>
   );
