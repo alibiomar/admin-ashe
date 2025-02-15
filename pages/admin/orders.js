@@ -5,6 +5,17 @@ import { db } from "../../lib/firebaseClient";
 import { collection, onSnapshot, doc, updateDoc, query, orderBy, setDoc, getDoc } from "firebase/firestore";
 import { FiPackage, FiTruck, FiClock, FiXCircle, FiCheckCircle, FiUser, FiPhone, FiSearch } from "react-icons/fi";
 
+// Helper function to safely convert createdAt to milliseconds
+const getCreatedAtMillis = (createdAt) => {
+  if (createdAt && typeof createdAt.toMillis === 'function') {
+    return createdAt.toMillis();
+  } else if (createdAt instanceof Date) {
+    return createdAt.getTime();
+  } else {
+    return createdAt || 0;
+  }
+};
+
 export default function Orders() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -60,7 +71,8 @@ export default function Orders() {
   // Filter orders based on search term, active tab, and last viewed timestamp
   const filteredOrders = useCallback(() => {
     return orders.filter((order) => {
-      const isNew = order.createdAt.toMillis() > lastViewed;
+      const createdAtMillis = getCreatedAtMillis(order.createdAt);
+      const isNew = createdAtMillis > lastViewed;
       const matchesSearch =
         order.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
         order.userInfo?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -188,7 +200,7 @@ export default function Orders() {
           <div className="space-y-1">
             <label className="text-xs font-medium text-gray-400">DATE</label>
             <p className="text-gray-600">
-              {new Date(order.createdAt.toMillis()).toLocaleDateString()}
+              {new Date(getCreatedAtMillis(order.createdAt)).toLocaleDateString()}
             </p>
           </div>
           <div className="space-y-1">
@@ -344,7 +356,7 @@ export default function Orders() {
         <div className="pt-4 border-t border-gray-200 text-sm text-gray-500">
           <p>
             Ordered on:{" "}
-            {new Date(selectedOrder.createdAt.toMillis()).toLocaleString()}
+            {new Date(getCreatedAtMillis(selectedOrder.createdAt)).toLocaleString()}
           </p>
         </div>
       </div>
@@ -370,7 +382,7 @@ export default function Orders() {
                 {tab.charAt(0).toUpperCase() + tab.slice(1)} (
                 {filteredOrders().filter((order) => {
                   if (tab === "new") {
-                    return order.createdAt.toMillis() > lastViewed;
+                    return getCreatedAtMillis(order.createdAt) > lastViewed;
                   } else if (tab === "pending") {
                     return order.status === "Pending";
                   } else {
