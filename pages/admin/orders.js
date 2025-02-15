@@ -1,9 +1,9 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import AdminLayout from "../../components/layout/AdminLayout";
 import AuthCheck from "../../components/auth/AuthCheck";
 import { db } from "../../lib/firebaseClient";
-import { collection, onSnapshot, doc, updateDoc } from "firebase/firestore";
-import { FiPackage, FiTruck, FiClock, FiXCircle, FiCheckCircle, FiUser, FiPhone } from "react-icons/fi";
+import { collection, onSnapshot, doc, updateDoc, query, orderBy } from "firebase/firestore";
+import { FiPackage, FiTruck, FiClock, FiXCircle, FiCheckCircle, FiUser, FiPhone, FiSearch, FiFilter, FiMail, FiMapPin } from "react-icons/fi";
 
 export default function Orders() {
   const [orders, setOrders] = useState([]);
@@ -11,74 +11,157 @@ export default function Orders() {
   const [error, setError] = useState(null);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [activeTab, setActiveTab] = useState("pending");
-
-  // Ref for the modal
+  const [searchTerm, setSearchTerm] = useState("");
+  const [sortOrder, setSortOrder] = useState("desc");
+  
   const modalRef = useRef(null);
+
+  // Memoized filter function
+  const filteredOrders = useCallback(() => {
+    return orders.filter(order => {
+      const matchesSearch = 
+        order.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        order.userInfo?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        order.userInfo?.phone?.includes(searchTerm);
+      const matchesTab = 
+        (activeTab === "pending" && order.status === "Pending") ||
+        (activeTab === "shipped" && order.status === "Shipped");
+      return matchesSearch && matchesTab;
+    });
+  }, [orders, searchTerm, activeTab]);
+
+  // Request notification permission
+  useEffect(() => {
+    if ("Notification" in window) {
+      Notification.requestPermission();
+    }
+  }, []);
 
   // Close modal when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (modalRef.current && !modalRef.current.contains(event.target)) {
-        setSelectedOrder(null); // Close the modal
+        setSelectedOrder(null);
       }
     };
 
-    // Add event listener when the modal is open
     if (selectedOrder) {
       document.addEventListener("mousedown", handleClickOutside);
     }
 
-    // Cleanup event listener
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, [selectedOrder]);
 
-  // Fetch orders from Firestore using onSnapshot for real-time updates
+  // Fetch orders from Firestore
   useEffect(() => {
     const ordersCollection = collection(db, "orders");
+    const ordersQuery = query(ordersCollection, orderBy("createdAt", sortOrder));
 
     const unsubscribe = onSnapshot(
-      ordersCollection,
+      ordersQuery,
       (ordersSnapshot) => {
         const ordersData = ordersSnapshot.docs.map((doc) => ({
           id: doc.id,
           ...doc.data(),
         }));
+
+        ordersSnapshot.docChanges().forEach((change) => {
+          if (change.type === "added" && Notification.permission === "granted") {
+            const newOrder = change.doc.data();
+            new Notification("New Order Received!", {
+              body: `Order #${change.doc.id.slice(0, 8)} - ${newOrder.userInfo?.name || "Unknown Customer"}`,
+              icon: "/path/to/icon.png",
+            });
+          }
+        });
+
         setOrders(ordersData);
-        setLoading(false); // Set loading to false after data is fetched
+        setLoading(false);
       },
       (err) => {
-        setError("Failed to fetch orders.");
+        setError("Failed to fetch orders: " + err.message);
         console.error("Error fetching orders:", err);
-        setLoading(false); // Stop loading if an error occurs
       }
     );
 
-    // Cleanup the listener when component unmounts
     return () => unsubscribe();
+  }, [sortOrder]);
+
+  // Error boundary handler
+  useEffect(() => {
+    const handleError = (error) => {
+      setError(`An unexpected error occurred: ${error.message}`);
+      setLoading(false);
+    };
+
+    window.addEventListener('error', handleError);
+    return () => window.removeEventListener('error', handleError);
   }, []);
 
   // Update order status
   const updateOrderStatus = async (orderId, newStatus) => {
     try {
       const orderDoc = doc(db, "orders", orderId);
-      await updateDoc(orderDoc, { status: newStatus });
+      await updateDoc(orderDoc, { 
+        status: newStatus,
+        updatedAt: new Date().toISOString()
+      });
 
+      // Optimistic update
       setOrders((prevOrders) =>
         prevOrders.map((order) =>
-          order.id === orderId ? { ...order, status: newStatus } : order
+          order.id === orderId 
+            ? { ...order, status: newStatus, updatedAt: new Date().toISOString() } 
+            : order
         )
       );
     } catch (err) {
-      setError("Failed to update order status.");
+      setError("Failed to update order status: " + err.message);
       console.error("Error updating order status:", err);
     }
   };
 
-  // Filter orders
-  const shippedOrders = orders.filter((order) => order.status === "Shipped");
-  const pendingOrders = orders.filter((order) => order.status === "Pending");
+  // Search and filter controls
+  const renderControls = () => (
+    <div className="mb-6 space-y-4 md:space-y-0 md:flex md:items-center md:justify-between">
+      <div className="relative flex-1 max-w-md">
+        <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+        <input
+          type="text"
+          placeholder="Search by order ID, customer name or phone..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#46c7c7] focus:border-transparent"
+        />
+      </div>
+      
+      <div className="flex items-center gap-4">
+        <select
+          value={sortOrder}
+          onChange={(e) => setSortOrder(e.target.value)}
+          className="px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#46c7c7]"
+        >
+          <option value="desc">Newest First</option>
+          <option value="asc">Oldest First</option>
+        </select>
+      </div>
+    </div>
+  );
+
+  // Empty state component
+  const renderEmptyState = () => (
+    <div className="text-center py-12">
+      <FiPackage className="mx-auto text-6xl text-gray-300 mb-4" />
+      <h3 className="text-xl font-medium text-gray-600 mb-2">No Orders Found</h3>
+      <p className="text-gray-400">
+        {searchTerm 
+          ? "Try adjusting your search terms"
+          : `No ${activeTab} orders at the moment`}
+      </p>
+    </div>
+  );
 
   // Render Order Card
   const renderOrderCard = (order) => (
@@ -118,7 +201,7 @@ export default function Orders() {
           </div>
           <div className="space-y-1">
             <label className="text-xs font-medium text-gray-400">STATUS</label>
-            <div className={`inline-flex items-center px-3 py-1 rounded-full text-sm ${
+            <div className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
               order.status === "Shipped" 
                 ? "bg-green-100 text-green-700"
                 : "bg-orange-100 text-orange-700"
@@ -157,11 +240,11 @@ export default function Orders() {
     </div>
   );
 
-  // Modal for shipping information
+  // Modal for order details
   const renderShippingModal = () => (
-    <div className="fixed inset-0 bg-black bg-opacity-30 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-scroll">
+    <div className="fixed inset-0 bg-black bg-opacity-30 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-auto">
       <div
-        ref={modalRef} // Attach ref to the modal content
+        ref={modalRef}
         className="bg-white rounded-2xl p-8 max-w-2xl w-full space-y-6 shadow-xl"
       >
         <div className="flex justify-between items-start">
@@ -171,7 +254,7 @@ export default function Orders() {
           </h3>
           <button
             onClick={() => setSelectedOrder(null)}
-            className="p-2 hover:bg-gray-100 rounded-full"
+            className="p-2 hover:bg-gray-100 rounded-full transition-colors"
           >
             <FiXCircle className="text-gray-500 text-xl" />
           </button>
@@ -186,13 +269,20 @@ export default function Orders() {
               </h4>
               <div className="space-y-2 text-sm">
                 <p><span className="font-medium">Name:</span> {selectedOrder.userInfo?.name || "N/A"}</p>
-                <p><span className="font-medium">Email:</span> {selectedOrder.userInfo?.email || "N/A"}</p>
-                <p><span className="font-medium">Phone:</span> {selectedOrder.userInfo?.phone || "N/A"}</p>
+                <p className="flex items-center gap-2">
+                  <FiMail className="text-gray-400" />
+                  {selectedOrder.userInfo?.email || "N/A"}
+                </p>
+                <p className="flex items-center gap-2">
+                  <FiPhone className="text-gray-400" />
+                  {selectedOrder.userInfo?.phone || "N/A"}
+                </p>
               </div>
             </div>
+
             <div className="bg-gray-50 p-4 rounded-xl">
               <h4 className="font-medium mb-3 flex items-center gap-2">
-                <FiTruck className="text-[#46c7c7]" />
+                <FiMapPin className="text-[#46c7c7]" />
                 Shipping Information
               </h4>
               {selectedOrder.shippingInfo ? (
@@ -202,7 +292,7 @@ export default function Orders() {
                   <p>{selectedOrder.shippingInfo.zipCode}</p>
                 </div>
               ) : (
-                <p className="text-gray-400">No shipping information</p>
+                <p className="text-gray-400">No shipping information available</p>
               )}
             </div>
           </div>
