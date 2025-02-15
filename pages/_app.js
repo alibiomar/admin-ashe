@@ -1,3 +1,5 @@
+'use client';
+
 import { AuthProvider } from "../contexts/authContext";
 import "../styles/globals.css";
 
