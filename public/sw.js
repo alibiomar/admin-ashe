@@ -44,20 +44,14 @@ precacheAndRoute(
 
 // Install event with improved error handling
 self.addEventListener('install', (event) => {
+  console.log('Service Worker installing...');
   event.waitUntil(
-    (async () => {
-      try {
-        const cache = await caches.open(CACHE_CONFIG.staticCache);
-        await cache.addAll(CACHE_CONFIG.precacheList);
-        await self.skipWaiting();
-        console.log('📦 Service Worker installation complete');
-      } catch (error) {
-        console.error('❌ Service Worker installation failed:', error);
-        throw error;
-      }
-    })()
+    caches.open('my-cache').then((cache) => {
+      return cache.addAll(CACHE_CONFIG.precacheList);  // List the assets you want to cache
+    })
   );
 });
+
 
 // Activate event with versioned cache cleanup
 self.addEventListener('activate', (event) => {
@@ -205,18 +199,6 @@ self.addEventListener('notificationclick', (event) => {
   );
 });
 
-// Network routes remain the same
-registerRoute(
-  ({url}) => url.pathname.startsWith('/api/'),
-  new NetworkFirst({
-    cacheName: CACHE_CONFIG.apiCache,
-    plugins: [{
-      cacheWillUpdate: async ({response}) => {
-        return response?.status === 200 ? response : null;
-      }
-    }]
-  })
-);
 
 registerRoute(
   ({request}) => 
