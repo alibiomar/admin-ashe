@@ -3,45 +3,13 @@ import { useEffect, useState } from "react";
 import { AuthProvider } from "../contexts/authContext";
 import NotificationPermission from "../components/NotificationPermission";
 import CollectionListener from "../components/CollectionListener";
-import { registerServiceWorker } from "../lib/serviceWorkerUtils";
 import "../styles/globals.css";
 
 function MyApp({ Component, pageProps }) {
   const [showPermission, setShowPermission] = useState(false);
-  const [swRegistration, setSwRegistration] = useState(null);
-  const [isSwReady, setIsSwReady] = useState(false);
 
-  // Service Worker registration and management
-  useEffect(() => {
-    const initServiceWorker = async () => {
-      try {
-        const registration = await registerServiceWorker();
-        if (registration) {
-          setSwRegistration(registration);
-          
-          // Handle Service Worker state changes
-          const handleStateChange = (event) => {
-            console.log(`Service Worker state changed to: ${event.target.state}`);
-            if (event.target.state === "activated") {
-              console.log("🚀 Service Worker activated!");
-              setIsSwReady(true);
-            }
-          };
 
-          registration.addEventListener("statechange", handleStateChange);
 
-          // Cleanup listener
-          return () => {
-            registration.removeEventListener("statechange", handleStateChange);
-          };
-        }
-      } catch (error) {
-        console.error("❌ Service Worker initialization failed:", error);
-      }
-    };
-
-    initServiceWorker();
-  }, []);
 
   // Notification permission management with user interaction
   useEffect(() => {
@@ -81,9 +49,7 @@ function MyApp({ Component, pageProps }) {
   return (
     <AuthProvider>
       {showPermission && <NotificationPermission />}
-      {isSwReady && swRegistration && (
-        <CollectionListener swRegistration={swRegistration} />
-      )}
+        <CollectionListener />
       <Component {...pageProps} />
     </AuthProvider>
   );
