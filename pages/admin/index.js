@@ -59,6 +59,11 @@ export default function Dashboard() {
     fetchStats();
   }, []);
 
+  // Safely access orderStatusBreakdown
+  const orderStatusData = stats?.orderStatusBreakdown
+    ? Object.entries(stats.orderStatusBreakdown).map(([name, value]) => ({ name, value }))
+    : [];
+
   return (
     <AuthCheck>
       <AdminLayout>
@@ -124,7 +129,7 @@ export default function Dashboard() {
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
                         <Pie
-                          data={Object.entries(stats.orderStatusBreakdown).map(([name, value]) => ({ name, value }))}
+                          data={orderStatusData}
                           dataKey="value"
                           nameKey="name"
                           cx="50%"
@@ -132,7 +137,7 @@ export default function Dashboard() {
                           outerRadius={80}
                           label
                         >
-                          {Object.keys(stats.orderStatusBreakdown).map((status, index) => (
+                          {orderStatusData.map((_, index) => (
                             <Cell key={index} fill={['#6366f1', '#3b82f6', '#10b981'][index % 3]} />
                           ))}
                         </Pie>
