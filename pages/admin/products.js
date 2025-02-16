@@ -198,7 +198,7 @@ export default function Products() {
             <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
               <h2 className="text-lg font-semibold text-gray-700 mb-6">Index</h2>
               <div>
-                <label className="block text-sm font-medium text-gray-600 mb-2">Index (TND)</label>
+                <label className="block text-sm font-medium text-gray-600 mb-2">Number of the product</label>
                 <input
                   type="text"
                   name="index"
