@@ -12,6 +12,8 @@ import {
   FiUser,
   FiPhone,
   FiSearch,
+  FiCreditCard,
+  FiBox,
 } from "react-icons/fi";
 
 const getCreatedAtMillis = (createdAt) => {
@@ -137,7 +139,23 @@ export default function Orders() {
       className="group p-6 bg-white rounded-xl border border-gray-100 hover:border-[#46c7c7] shadow-sm hover:shadow-lg transition-all duration-200 cursor-pointer"
     >
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 w-full">
+        <div className="grid grid-cols-2 md:grid-cols-7 gap-4 w-full">
+          {/* Added Items and Payment columns */}
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-gray-400">ITEMS</label>
+            <div className="flex items-center gap-2">
+              <FiBox className="text-gray-500" />
+              <p className="text-gray-600">{order.items?.length || 0}</p>
+            </div>
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-gray-400">PAYMENT</label>
+            <div className="flex items-center gap-2">
+              <FiCreditCard className="text-gray-500" />
+              <p className="text-gray-600">{order.paymentMethod || "N/A"}</p>
+            </div>
+          </div>
+          {/* Existing columns */}
           <div className="space-y-1">
             <label className="text-xs font-medium text-gray-400">ORDER ID</label>
             <p className="font-medium text-gray-800">{order.id.slice(0, 8)}</p>
@@ -171,18 +189,23 @@ export default function Orders() {
               className={`inline-flex items-center px-3 py-1 rounded-full text-sm ${
                 order.status === "Shipped"
                   ? "bg-green-100 text-green-700"
-                  : "bg-orange-100 text-orange-700"
+                  : order.status === "Pending"
+                  ? "bg-orange-100 text-orange-700"
+                  : "bg-blue-100 text-blue-700"
               }`}
             >
               {order.status === "Shipped" ? (
                 <FiTruck className="mr-2" />
-              ) : (
+              ) : order.status === "Pending" ? (
                 <FiClock className="mr-2" />
+              ) : (
+                <FiPackage className="mr-2" />
               )}
               {order.status}
             </div>
           </div>
         </div>
+        {/* Improved status toggle button */}
         <button
           onClick={(e) => {
             e.stopPropagation();
@@ -193,16 +216,21 @@ export default function Orders() {
           }}
           className={`flex items-center px-4 py-2 rounded-lg transition-colors ${
             order.status === "Pending"
-              ? "bg-[#46c7c7] hover:bg-[#3aa8a8] text-white"
+              ? "bg-[#46c7c7] hover:bg-[#3aa8a8] text-white shadow-md"
               : "bg-gray-100 hover:bg-gray-200 text-gray-700"
           }`}
         >
           {order.status === "Pending" ? (
-            <FiCheckCircle className="mr-2" />
+            <>
+              <FiCheckCircle className="mr-2" />
+              Confirm Shipment
+            </>
           ) : (
-            <FiXCircle className="mr-2" />
+            <>
+              <FiClock className="mr-2" />
+              Mark as Pending
+            </>
           )}
-          {order.status === "Pending" ? "Mark Shipped" : "Revert Status"}
         </button>
       </div>
     </div>
