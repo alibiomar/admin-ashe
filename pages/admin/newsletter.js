@@ -21,7 +21,7 @@ const useNewsletterStore = () => {
 
   // Fetch subscribers in real-time
   useEffect(() => {
-    const q = query(collection(db, "newsletter_signups"), orderBy("createdAt", "desc"));
+    const q = query(collection(db, "newsletter_signups"), orderBy("timestamp", "desc"));
 
     const unsubscribe = onSnapshot(
       q,
@@ -29,7 +29,7 @@ const useNewsletterStore = () => {
         const subs = snapshot.docs.map((doc) => ({
           id: doc.id,
           ...doc.data(),
-          createdAt: doc.data().createdAt?.toDate().toLocaleDateString(),
+          timestamp: doc.data().timestamp?.toDate().toLocaleDateString(),
         }));
         setSubscribers(subs);
         setLoading(false);
@@ -291,7 +291,7 @@ export default function Newsletter() {
                         <div className="text-sm font-medium text-gray-900">{sub.email}</div>
                         {sub.name && <div className="text-sm text-gray-500">{sub.name}</div>}
                       </td>
-                      <td className="px-6 py-4 text-sm text-gray-500">{sub.createdAt}</td>
+                      <td className="px-6 py-4 text-sm text-gray-500">{sub.timestamp}</td>
                       <td className="px-6 py-4">
                         <button
                           onClick={() => handleDelete(sub.id)}
