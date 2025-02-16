@@ -91,7 +91,7 @@ const OnlineUsersList = ({ users }) => (
     <h2 className="text-xl font-semibold">Online Users</h2>
     <ul>
       {users.map(user => (
-        <li key={user.id}>{user.firstName} ({user.lastName})</li>
+        <li key={user.id}>{user.firstName} {user.lastName}</li>
       ))}
     </ul>
   </div>
