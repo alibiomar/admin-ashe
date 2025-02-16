@@ -6,6 +6,7 @@ export default function Dashboard() {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [onlineUsers, setOnlineUsers] = useState([]);
 
   const fetchStats = useCallback(async () => {
     try {
@@ -20,9 +21,21 @@ export default function Dashboard() {
     }
   }, []);
 
+  const fetchOnlineUsers = useCallback(async () => {
+    try {
+      const response = await fetch('/api/online-users');
+      if (!response.ok) throw new Error('Failed to fetch online users');
+      const data = await response.json();
+      setOnlineUsers(data.onlineUsers);
+    } catch (err) {
+      setError(err.message);
+    }
+  }, []);
+
   useEffect(() => {
     fetchStats();
-  }, [fetchStats]);
+    fetchOnlineUsers();
+  }, [fetchStats, fetchOnlineUsers]);
 
   return (
     <AuthCheck>
@@ -44,7 +57,9 @@ export default function Dashboard() {
               <StatCard title="New Customers" value={stats.newCustomers} />
               <StatCard title="Out of Stock Products" value={stats.outOfStock} />
               <StatCard title="Low Stock Products" value={stats.lowStock} />
+              <StatCard title="Online Users" value={onlineUsers.length} />
               <OrderStatusBreakdown orderStatusBreakdown={stats.orderStatusBreakdown} />
+              <OnlineUsersList users={onlineUsers} />
             </div>
           )}
         </div>
@@ -66,6 +81,17 @@ const OrderStatusBreakdown = ({ orderStatusBreakdown }) => (
     <ul>
       {Object.entries(orderStatusBreakdown).map(([status, count]) => (
         <li key={status}>{status}: {count}</li>
+      ))}
+    </ul>
+  </div>
+);
+
+const OnlineUsersList = ({ users }) => (
+  <div className="p-4 border rounded-lg shadow">
+    <h2 className="text-xl font-semibold">Online Users</h2>
+    <ul>
+      {users.map(user => (
+        <li key={user.id}>{user.firstName} ({user.lastName})</li>
       ))}
     </ul>
   </div>

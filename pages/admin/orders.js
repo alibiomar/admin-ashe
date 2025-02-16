@@ -73,6 +73,14 @@ export default function Orders() {
     }
   };
 
+  const handleStatusChange = (order) => {
+    if (order.status === "New") {
+      updateOrderStatus(order.id, "Pending");
+    } else if (order.status === "Pending") {
+      updateOrderStatus(order.id, "Shipped");
+    }
+  };
+
   const filteredOrders = useMemo(() => {
     return orders.filter((order) =>
       order.userInfo?.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -144,23 +152,22 @@ export default function Orders() {
         <button
           onClick={(e) => {
             e.stopPropagation();
-            updateOrderStatus(
-              order.id,
-              order.status === "New" ? "Shipped" : "New"
-            );
+            handleStatusChange(order);
           }}
           className={`flex items-center px-4 py-2 rounded-lg transition-colors ${
-            order.status === "New"
+            order.status === "New" || order.status === "Pending"
               ? "bg-[#46c7c7] hover:bg-[#3aa8a8] text-white"
               : "bg-gray-100 hover:bg-gray-200 text-gray-700"
           }`}
         >
           {order.status === "New" ? (
             <FiCheckCircle className="mr-2" />
+          ) : order.status === "Pending" ? (
+            <FiClock className="mr-2" />
           ) : (
             <FiXCircle className="mr-2" />
           )}
-          {order.status === "New" ? "Mark Shipped" : "Revert to New"}
+          {order.status === "New" ? "Mark Pending" : order.status === "Pending" ? "Mark Shipped" : "Revert to New"}
         </button>
       </div>
     </div>
