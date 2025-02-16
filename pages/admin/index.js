@@ -132,7 +132,7 @@ export default function Dashboard() {
                           outerRadius={80}
                           label
                         >
-                          {Object.keys(stats.orderStatusBreakdown).map((status, index) => (
+                          {Object.keys(stats.orderStatusBreakdown).map((_, index) => (
                             <Cell key={index} fill={['#6366f1', '#3b82f6', '#10b981'][index % 3]} />
                           ))}
                         </Pie>
