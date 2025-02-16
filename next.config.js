@@ -30,23 +30,10 @@ const nextConfig = {
   poweredByHeader: false,
   reactStrictMode: true,
   productionBrowserSourceMaps: false,
+
 };
 
 module.exports = withPWA({
   disable: isDev, // Disable PWA in development mode
   dest: 'public', // Destination folder for PWA files
-  runtimeCaching: [
-    {
-      urlPattern: ({ request }) => request.mode === 'navigate',
-      handler: 'NetworkFirst',
-      options: {
-        cacheName: 'pages-cache',
-        networkTimeoutSeconds: 3,
-        expiration: { maxEntries: 50, maxAgeSeconds: 7 * 24 * 60 * 60 }, // Cache for 7 days
-        fallback: {
-          document: '/offline.html', // Ensure you have this file in /public
-        },
-      },
-    },
-  ],
 })(nextConfig);
