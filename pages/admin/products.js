@@ -3,8 +3,6 @@ import AdminLayout from "../../components/layout/AdminLayout";
 import AuthCheck from "../../components/auth/AuthCheck";
 import { db } from "../../lib/firebaseClient";
 import { collection, addDoc } from "firebase/firestore";
-import { toast } from "react-toastify";
-import "react-toastify/dist/ReactToastify.css";
 import { FiTrash, FiPlus } from "react-icons/fi";
 
 export default function Products() {
@@ -112,10 +110,10 @@ export default function Products() {
       });
       setSizeInputs([{ size: "", stock: "" }]);
       
-      toast.success("Product added successfully!");
+      alert("Product added successfully!");
     } catch (error) {
       console.error("Error adding product:", error);
-      toast.error(error.message || "Failed to add product");
+      alert(error.message || "Failed to add product");
     } finally {
       setLoading(false);
     }
