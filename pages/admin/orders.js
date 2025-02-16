@@ -10,7 +10,7 @@ export default function Orders() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedOrder, setSelectedOrder] = useState(null);
-  const [activeTab, setActiveTab] = useState("pending");
+  const [activeTab, setActiveTab] = useState("new");
 
   // Ref for the modal
   const modalRef = useRef(null);
@@ -78,7 +78,7 @@ export default function Orders() {
 
   // Filter orders
   const shippedOrders = orders.filter((order) => order.status === "Shipped");
-  const pendingOrders = orders.filter((order) => order.status === "Pending");
+  const newOrders = orders.filter((order) => order.status === "New");
 
   // Render Order Card
   const renderOrderCard = (order) => (
@@ -121,6 +121,8 @@ export default function Orders() {
             <div className={`inline-flex items-center px-3 py-1 rounded-full text-sm ${
               order.status === "Shipped" 
                 ? "bg-green-100 text-green-700"
+                : order.status === "New"
+                ? "bg-blue-100 text-blue-700"
                 : "bg-orange-100 text-orange-700"
             }`}>
               {order.status === "Shipped" ? (
@@ -137,21 +139,21 @@ export default function Orders() {
             e.stopPropagation();
             updateOrderStatus(
               order.id,
-              order.status === "Pending" ? "Shipped" : "Pending"
+              order.status === "New" ? "Shipped" : "New"
             );
           }}
           className={`flex items-center px-4 py-2 rounded-lg transition-colors ${
-            order.status === "Pending"
+            order.status === "New"
               ? "bg-[#46c7c7] hover:bg-[#3aa8a8] text-white"
               : "bg-gray-100 hover:bg-gray-200 text-gray-700"
           }`}
         >
-          {order.status === "Pending" ? (
+          {order.status === "New" ? (
             <FiCheckCircle className="mr-2" />
           ) : (
             <FiXCircle className="mr-2" />
           )}
-          {order.status === "Pending" ? "Mark Shipped" : "Revert Status"}
+          {order.status === "New" ? "Mark Shipped" : "Revert to New"}
         </button>
       </div>
     </div>
@@ -241,7 +243,7 @@ export default function Orders() {
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
           <h1 className="text-3xl font-bold text-gray-900">Order Management</h1>
           <div className="flex gap-2 bg-gray-100 p-1 rounded-xl">
-            {["pending", "shipped"].map((tab) => (
+            {["new", "shipped"].map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
@@ -252,7 +254,7 @@ export default function Orders() {
                 }`}
               >
                 {tab.charAt(0).toUpperCase() + tab.slice(1)} (
-                {tab === "pending" ? pendingOrders.length : shippedOrders.length})
+                {tab === "new" ? newOrders.length : shippedOrders.length})
               </button>
             ))}
           </div>
@@ -271,7 +273,7 @@ export default function Orders() {
         )}
 
         <div className="space-y-4">
-          {(activeTab === "pending" ? pendingOrders : shippedOrders).map(
+          {(activeTab === "new" ? newOrders : shippedOrders).map(
             renderOrderCard
           )}
         </div>
