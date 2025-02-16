@@ -220,47 +220,46 @@ export default function Products() {
               </div>
             </div>
 
-            {/* Sizes & Stock Section */}
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-              <h2 className="text-lg font-semibold text-gray-700 mb-6">Sizes & Inventory</h2>
-              <div className="space-y-4">
-                {sizeInputs.map((input, index) => (
-                  <div key={index} className="flex gap-3 items-center">
-                    <input
-                      type="text"
-                      placeholder="Size (e.g., S/M/L)"
-                      value={input.size}
-                      onChange={(e) => handleSizeStockChange(index, "size", e.target.value)}
-                      className="flex-1 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#46c7c7] focus:border-[#46c7c7] transition-all"
-                    />
-                    <input
-                      type="number"
-                      placeholder="Stock"
-                      value={input.stock}
-                      onChange={(e) => handleSizeStockChange(index, "stock", e.target.value)}
-                      className="w-32 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#46c7c7] focus:border-[#46c7c7] transition-all"
-                    />
-                    {index > 0 && (
-                      <button
-                        type="button"
-                        onClick={() => removeSizeStockField(index)}
-                        className="p-2 text-red-500 hover:bg-red-50 rounded-full transition-colors"
-                      >
-                        <FiTrash className="w-5 h-5" />
-                      </button>
-                    )}
-                  </div>
-                ))}
-                <button
-                  type="button"
-                  onClick={addSizeStockField}
-                  className="flex items-center gap-2 text-[#46c7c7] hover:text-[#3aa8a8] font-medium py-2 px-4 rounded-lg border border-[#46c7c7] hover:border-[#3aa8a8] transition-all"
-                >
-                  <FiPlus className="w-5 h-5" />
-                  Add Size & Stock
-                </button>
-              </div>
-            </div>
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 md:p-8">
+  <h2 className="text-lg font-semibold text-gray-700 mb-6 md:text-xl md:mb-8">Sizes & Inventory</h2>
+  <div className="space-y-4">
+    {sizeInputs.map((input, index) => (
+      <div key={index} className="flex flex-col md:flex-row gap-3 items-center md:items-start">
+        <input
+          type="text"
+          placeholder="Size (e.g., S/M/L)"
+          value={input.size}
+          onChange={(e) => handleSizeStockChange(index, "size", e.target.value)}
+          className="flex-1 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#46c7c7] focus:border-[#46c7c7] transition-all w-full md:w-auto"
+        />
+        <input
+          type="number"
+          placeholder="Stock"
+          value={input.stock}
+          onChange={(e) => handleSizeStockChange(index, "stock", e.target.value)}
+          className="w-full md:w-32 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#46c7c7] focus:border-[#46c7c7] transition-all mt-2 md:mt-0"
+        />
+        {index > 0 && (
+          <button
+            type="button"
+            onClick={() => removeSizeStockField(index)}
+            className="p-2 text-red-500 hover:bg-red-50 rounded-full transition-colors mt-2 md:mt-0"
+          >
+            <FiTrash className="w-5 h-5" />
+          </button>
+        )}
+      </div>
+    ))}
+    <button
+      type="button"
+      onClick={addSizeStockField}
+      className="flex items-center gap-2 text-[#46c7c7] hover:text-[#3aa8a8] font-medium py-2 px-4 rounded-lg border border-[#46c7c7] hover:border-[#3aa8a8] transition-all mt-4 w-full md:w-auto justify-center"
+    >
+      <FiPlus className="w-5 h-5" />
+      Add Size & Stock
+    </button>
+  </div>
+</div>
 
             {/* Submit Button */}
             <button
