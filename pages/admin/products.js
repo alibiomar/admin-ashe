@@ -91,6 +91,7 @@ export default function Products() {
       const productsCollection = collection(db, "products");
       await addDoc(productsCollection, {
         name: product.name,
+        index: product.index,
         description: product.description,
         price: parseFloat(product.price),
         images: product.images.filter(url => url.trim()),
@@ -138,7 +139,16 @@ export default function Products() {
                 className="w-full p-2 border rounded"
               />
             </div>
-
+            <div>
+              <label className="block text-sm font-medium mb-2">Index</label>
+              <textarea
+                name="index"
+                value={product.index}
+                onChange={handleInputChange}
+                required
+                className="w-full p-2 border rounded h-32"
+              />
+            </div>
             {/* Product Description */}
             <div>
               <label className="block text-sm font-medium mb-2">Description</label>
