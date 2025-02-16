@@ -9,6 +9,7 @@ export default function Products() {
   const [product, setProduct] = useState({
     name: "",
     description: "",
+    index: "",
     price: "",
     images: [""],
     sizes: [],
@@ -92,6 +93,7 @@ export default function Products() {
       const productsCollection = collection(db, "products");
       await addDoc(productsCollection, {
         name: product.name,
+        index: product.index,
         description: product.description,
         price: parseFloat(product.price),
         images: product.images.filter(url => url.trim()),
@@ -105,6 +107,7 @@ export default function Products() {
         name: "",
         description: "",
         price: "",
+        index: "",
         images: [""],
         sizes: [],
         stock: {}
@@ -184,6 +187,22 @@ export default function Products() {
                   type="number"
                   name="price"
                   value={product.price}
+                  onChange={handleInputChange}
+                  required
+                  step="0.01"
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#46c7c7] focus:border-[#46c7c7] transition-all"
+                />
+              </div>
+            </div>
+            
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+              <h2 className="text-lg font-semibold text-gray-700 mb-6">Index</h2>
+              <div>
+                <label className="block text-sm font-medium text-gray-600 mb-2">Index (TND)</label>
+                <input
+                  type="text"
+                  name="index"
+                  value={product.index}
                   onChange={handleInputChange}
                   required
                   step="0.01"
