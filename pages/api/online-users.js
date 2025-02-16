@@ -10,11 +10,13 @@ export default async function handler(req, res) {
     const now = new Date();
     const fiveMinutesAgo = new Date(now.getTime() - 5 * 60 * 1000);
 
-    const usersSnapshot = await adminDb.collection('users').where('lastActivity', '>=', fiveMinutesAgo).get();
+    const usersSnapshot = await adminDb
+      .collection('users')
+      .where('lastActivity', '>=', fiveMinutesAgo)
+      .get();
+
     const onlineUsers = usersSnapshot.docs.map(doc => ({
       id: doc.id,
-      firstName: doc.data().firstName,
-      lastName: doc.data().lastName, // Assuming the user document has a 'name' field
       ...doc.data()
     }));
 

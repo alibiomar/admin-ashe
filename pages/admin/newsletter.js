@@ -10,7 +10,17 @@ import {
   orderBy,
   onSnapshot,
 } from "firebase/firestore";
-import { FiSearch, FiTrash2, FiMail, FiUser, FiCalendar, FiSend, FiDownload, FiEye } from "react-icons/fi";
+import {
+  FiSearch,
+  FiTrash2,
+  FiMail,
+  FiUser,
+  FiCalendar,
+  FiSend,
+  FiDownload,
+  FiEye,
+  FiX,
+} from "react-icons/fi";
 import { marked } from "marked"; // For markdown to HTML conversion (optional)
 
 // Flux-inspired state management
@@ -185,38 +195,41 @@ export default function Newsletter() {
   }, [notification]);
 
   // Memoize the renderSubscriber function to prevent unnecessary re-renders
-  const renderSubscriber = useCallback((sub) => (
-    <tr key={sub.id} className="hover:bg-gray-50 transition-colors">
-      <td className="px-6 py-4">
-        <input
-          type="checkbox"
-          checked={selectedEmails.includes(sub.id)}
-          onChange={() => toggleEmailSelection(sub.id)}
-          className="form-checkbox h-4 w-4 rounded border-gray-300 text-[#46c7c7] focus:ring-[#46c7c7]"
-        />
-      </td>
-      <td className="px-6 py-4">
-        <div className="flex items-center gap-3">
-          <div className="flex items-center justify-center w-8 h-8 rounded-full bg-[#46c7c7]/10 text-[#46c7c7]">
-            <FiUser className="w-4 h-4" />
+  const renderSubscriber = useCallback(
+    (sub) => (
+      <tr key={sub.id} className="hover:bg-gray-50 transition-colors">
+        <td className="px-6 py-4">
+          <input
+            type="checkbox"
+            checked={selectedEmails.includes(sub.id)}
+            onChange={() => toggleEmailSelection(sub.id)}
+            className="form-checkbox h-4 w-4 rounded border-gray-300 text-[#46c7c7] focus:ring-[#46c7c7]"
+          />
+        </td>
+        <td className="px-6 py-4">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center justify-center w-8 h-8 rounded-full bg-[#46c7c7]/10 text-[#46c7c7]">
+              <FiUser className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="font-medium text-gray-900">{sub.email}</div>
+              {sub.name && <div className="text-sm text-gray-500">{sub.name}</div>}
+            </div>
           </div>
-          <div>
-            <div className="font-medium text-gray-900">{sub.email}</div>
-            {sub.name && <div className="text-sm text-gray-500">{sub.name}</div>}
-          </div>
-        </div>
-      </td>
-      <td className="px-6 py-4 text-sm text-gray-500">{sub.timestamp}</td>
-      <td className="px-6 py-4">
-        <button
-          onClick={() => handleDelete(sub.id)}
-          className="flex items-center text-gray-400 hover:text-rose-500 transition-colors"
-        >
-          <FiTrash2 className="w-5 h-5" />
-        </button>
-      </td>
-    </tr>
-  ), [selectedEmails]);
+        </td>
+        <td className="px-6 py-4 text-sm text-gray-500">{sub.timestamp}</td>
+        <td className="px-6 py-4">
+          <button
+            onClick={() => handleDelete(sub.id)}
+            className="flex items-center text-gray-400 hover:text-rose-500 transition-colors"
+          >
+            <FiTrash2 className="w-5 h-5" />
+          </button>
+        </td>
+      </tr>
+    ),
+    [selectedEmails]
+  );
 
   return (
     <AuthCheck>
@@ -280,10 +293,10 @@ export default function Newsletter() {
               value={emailContent}
               onChange={(e) => setEmailContent(e.target.value)}
               placeholder="Write your HTML email content here..."
-              className="w-full p-4 border border-gray-200 rounded-lg focus:border-[#46c7c7] focus:ring-2 focus:ring-[#46c7c7]/20 h-64 transition-all font-mono text-sm"
+              className="w-full p-4 border border-gray-200 rounded-lg focus:border-[#46c7c7] focus:ring-2 focus:ring-[#46c7c7]/20 transition-all h-48 md:h-64 font-mono text-sm"
             />
-            <div className="mt-4 flex items-center justify-between">
-              <span className="text-sm text-gray-500">
+            <div className="mt-4 flex flex-col md:flex-row items-center justify-between">
+              <span className="text-sm text-gray-500 mb-2 md:mb-0">
                 {emailContent.length} characters • {emailContent.split(/\s+/).length} words
               </span>
               <div className="flex gap-3">
@@ -359,7 +372,7 @@ export default function Newsletter() {
             ) : (
               <>
                 <div className="overflow-x-auto">
-                  <table className="w-full">
+                  <table className="w-full min-w-full">
                     <thead className="bg-gray-50">
                       <tr>
                         <th className="px-6 py-3 text-left text-sm font-medium text-gray-500">
@@ -382,8 +395,8 @@ export default function Newsletter() {
                 </div>
 
                 {/* Pagination */}
-                <div className="flex items-center justify-between p-4 border-t border-gray-100">
-                  <span className="text-sm text-gray-500">
+                <div className="flex flex-col sm:flex-row items-center justify-between p-4 border-t border-gray-100">
+                  <span className="text-sm text-gray-500 mb-2 sm:mb-0">
                     Showing {indexOfFirstItem + 1} to {Math.min(indexOfLastItem, filteredSubscribers.length)} of {filteredSubscribers.length} entries
                   </span>
                   <div className="flex gap-2">
@@ -410,14 +423,14 @@ export default function Newsletter() {
           {/* Email Preview Modal */}
           {showPreview && (
             <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-              <div className="bg-white rounded-lg shadow-lg w-full max-w-2xl p-6">
+              <div className="bg-white rounded-lg shadow-lg w-full max-w-lg md:max-w-2xl p-6">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-lg font-semibold">Email Preview</h3>
                   <button
                     onClick={() => setShowPreview(false)}
                     className="text-gray-500 hover:text-gray-700"
                   >
-                    <FiTrash2 className="w-5 h-5" />
+                    <FiX className="w-6 h-6" />
                   </button>
                 </div>
                 <div
