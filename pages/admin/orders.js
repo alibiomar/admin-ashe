@@ -78,6 +78,8 @@ export default function Orders() {
       updateOrderStatus(order.id, "Pending");
     } else if (order.status === "Pending") {
       updateOrderStatus(order.id, "Shipped");
+    } else if (order.status === "Shipped") {
+      updateOrderStatus(order.id, "Pending");
     }
   };
 
@@ -155,7 +157,7 @@ export default function Orders() {
             handleStatusChange(order);
           }}
           className={`flex items-center px-4 py-2 rounded-lg transition-colors ${
-            order.status === "New" || order.status === "Pending"
+            order.status === "New" || order.status === "Pending" || order.status === "Shipped"
               ? "bg-[#46c7c7] hover:bg-[#3aa8a8] text-white"
               : "bg-gray-100 hover:bg-gray-200 text-gray-700"
           }`}
@@ -165,9 +167,13 @@ export default function Orders() {
           ) : order.status === "Pending" ? (
             <FiClock className="mr-2" />
           ) : (
-            <FiXCircle className="mr-2" />
+            <FiClock className="mr-2" />
           )}
-          {order.status === "New" ? "Mark Pending" : order.status === "Pending" ? "Mark Shipped" : "Revert to New"}
+          {order.status === "New" 
+            ? "Mark Pending" 
+            : order.status === "Pending" 
+            ? "Mark Shipped" 
+            : "Mark Pending"}
         </button>
       </div>
     </div>
