@@ -1,23 +1,38 @@
-// pages/api/newsletter/send.js
+import nodemailer from "nodemailer";
+
 export default async function handler(req, res) {
   if (req.method !== "POST") {
-    return res.status(405).end("Method Not Allowed");
+    return res.status(405).json({ error: "Method not allowed" });
   }
-  const { subject, content, recipients } = req.body;
-  if (!subject || !content || !recipients) {
-    return res.status(400).json({
-      error: "Missing fields: subject, content, and recipients are required",
+
+  const { emails, htmlContent } = req.body;
+
+  if (!emails || !htmlContent) {
+    return res.status(400).json({ error: "Missing required fields" });
+  }
+
+  const transporter = nodemailer.createTransport({
+    host: "ssl0.ovh.net", 
+    port: 465, 
+    secure: true, 
+    auth: {
+      user: process.env.SMTP_SERVER_USERNAME, 
+      pass: process.env.SMTP_SERVER_PASSWORD, 
+    },
+  });
+
+  try {
+    // Send email to all subscribers
+    await transporter.sendMail({
+      from: `Your Company <${process.env.SMTP_SERVER_USERNAME}>`, 
+      to: emails.join(", "), 
+      subject: "Your Newsletter", 
+      html: htmlContent, 
     });
+
+    res.status(200).json({ message: "Emails sent successfully" });
+  } catch (error) {
+    console.error("Error sending emails:", error);
+    res.status(500).json({ error: "Failed to send emails" });
   }
-
-  // TODO: Implement your newsletter sending logic here.
-  // For demonstration, we simply log the newsletter details.
-  console.log("Sending newsletter with subject:", subject);
-  console.log("Content:", content);
-  console.log("Recipients:", recipients);
-
-  // Simulate sending delay
-  await new Promise((resolve) => setTimeout(resolve, 1000));
-
-  res.status(200).json({ message: "Newsletter sent successfully" });
 }

@@ -1,226 +1,311 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from "react";
 import AdminLayout from "../../components/layout/AdminLayout";
 import AuthCheck from "../../components/auth/AuthCheck";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
-import { BarChart, Users, Mail, Send } from "lucide-react";
-import { collection, query, where, onSnapshot, orderBy } from 'firebase/firestore';
 import { db } from "../../lib/firebaseClient";
+import {
+  collection,
+  deleteDoc,
+  doc,
+  query,
+  orderBy,
+  where,
+  onSnapshot,
+} from "firebase/firestore";
+import { FiSearch, FiTrash2, FiMail, FiUser, FiCalendar, FiSend } from "react-icons/fi";
 
-const NewsletterStats = ({ stats }) => (
-  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium">Total Subscribers</CardTitle>
-        <Users className="h-4 w-4 text-muted-foreground" />
-      </CardHeader>
-      <CardContent>
-        <div className="text-2xl font-bold">{stats.totalSubscribers}</div>
-        <p className="text-xs text-muted-foreground">
-          {stats.monthlyGrowth > 0 ? '+' : ''}{stats.monthlyGrowth} from last month
-        </p>
-      </CardContent>
-    </Card>
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium">Open Rate</CardTitle>
-        <Mail className="h-4 w-4 text-muted-foreground" />
-      </CardHeader>
-      <CardContent>
-        <div className="text-2xl font-bold">{stats.openRate}%</div>
-        <p className="text-xs text-muted-foreground">
-          {stats.openRateChange > 0 ? '+' : ''}{stats.openRateChange}% from last campaign
-        </p>
-      </CardContent>
-    </Card>
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium">Click Rate</CardTitle>
-        <BarChart className="h-4 w-4 text-muted-foreground" />
-      </CardHeader>
-      <CardContent>
-        <div className="text-2xl font-bold">{stats.clickRate}%</div>
-        <p className="text-xs text-muted-foreground">
-          {stats.clickRateChange > 0 ? '+' : ''}{stats.clickRateChange}% from last campaign
-        </p>
-      </CardContent>
-    </Card>
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium">Campaigns Sent</CardTitle>
-        <Send className="h-4 w-4 text-muted-foreground" />
-      </CardHeader>
-      <CardContent>
-        <div className="text-2xl font-bold">{stats.totalCampaigns}</div>
-        <p className="text-xs text-muted-foreground">{stats.monthlyCampaigns} sent this month</p>
-      </CardContent>
-    </Card>
-  </div>
-);
+// Flux-inspired state management
+const useNewsletterStore = () => {
+  const [subscribers, setSubscribers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
-const ComposeNewsletter = () => (
-  <div className="space-y-4">
-    <div className="space-y-2">
-      <Input 
-        type="text" 
-        placeholder="Newsletter Subject" 
-        className="text-lg font-medium"
-      />
-    </div>
-    <div className="space-y-2">
-      <Textarea 
-        placeholder="Write your newsletter content here..." 
-        className="min-h-[300px]"
-      />
-    </div>
-    <div className="flex justify-end space-x-2">
-      <Button variant="outline">Save Draft</Button>
-      <Button>
-        <Send className="mr-2 h-4 w-4" />
-        Send Newsletter
-      </Button>
-    </div>
-  </div>
-);
+  // Fetch subscribers in real-time
+  useEffect(() => {
+    const q = query(collection(db, "newsletter_signups"), orderBy("createdAt", "desc"));
 
-const SubscriberList = ({ subscribers, loading }) => {
-  const [searchTerm, setSearchTerm] = useState('');
-  
-  const filteredSubscribers = subscribers.filter(sub => 
-    sub.email.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const subs = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+          createdAt: doc.data().createdAt?.toDate().toLocaleDateString(),
+        }));
+        setSubscribers(subs);
+        setLoading(false);
+      },
+      (err) => {
+        setError("Failed to fetch subscribers");
+        setLoading(false);
+      }
+    );
 
-  if (loading) {
-    return <div className="text-center py-4">Loading subscribers...</div>;
-  }
+    return () => unsubscribe(); // Cleanup on unmount
+  }, []);
 
-  return (
-    <div className="space-y-4">
-      <div className="flex justify-between items-center">
-        <Input 
-          type="search" 
-          placeholder="Search subscribers..." 
-          className="max-w-sm"
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-        />
-        <Button variant="outline">Export List</Button>
-      </div>
-      <div className="border rounded-lg">
-        <table className="w-full">
-          <thead>
-            <tr className="border-b bg-muted/50">
-              <th className="text-left p-2">Email</th>
-              <th className="text-left p-2">Subscribed Date</th>
-              <th className="text-left p-2">Status</th>
-              <th className="text-left p-2">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredSubscribers.map((subscriber) => (
-              <tr key={subscriber.id} className="border-b">
-                <td className="p-2">{subscriber.email}</td>
-                <td className="p-2">{new Date(subscriber.subscribedAt).toLocaleDateString()}</td>
-                <td className="p-2">
-                  <span className={`px-2 py-1 rounded-full text-xs ${
-                    subscriber.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                  }`}>
-                    {subscriber.status.charAt(0).toUpperCase() + subscriber.status.slice(1)}
-                  </span>
-                </td>
-                <td className="p-2">
-                  <Button variant="ghost" size="sm">Edit</Button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
+  // Delete a subscriber
+  const deleteSubscriber = async (id) => {
+    try {
+      await deleteDoc(doc(db, "newsletter_signups", id));
+      return true;
+    } catch (err) {
+      setError("Failed to delete subscriber");
+      return false;
+    }
+  };
+
+  // Bulk delete subscribers
+  const bulkDeleteSubscribers = async (ids) => {
+    try {
+      await Promise.all(ids.map((id) => deleteDoc(doc(db, "newsletter_signups", id))));
+      return true;
+    } catch (err) {
+      setError("Failed to delete subscribers");
+      return false;
+    }
+  };
+
+  return {
+    subscribers,
+    loading,
+    error,
+    deleteSubscriber,
+    bulkDeleteSubscribers,
+  };
 };
 
 export default function Newsletter() {
-  const [subscribers, setSubscribers] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState({
-    totalSubscribers: 0,
-    monthlyGrowth: 0,
-    openRate: 0,
-    openRateChange: 0,
-    clickRate: 0,
-    clickRateChange: 0,
-    totalCampaigns: 0,
-    monthlyCampaigns: 0
-  });
+  const {
+    subscribers,
+    loading,
+    error,
+    deleteSubscriber,
+    bulkDeleteSubscribers,
+  } = useNewsletterStore();
 
-  useEffect(() => {
-    // Subscribe to newsletter_signups collection
-    const q = query(
-      collection(db, 'newsletter_signups'),
-      orderBy('subscribedAt', 'desc')
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedEmails, setSelectedEmails] = useState([]);
+  const [notification, setNotification] = useState({ message: "", type: "" });
+  const [emailContent, setEmailContent] = useState(""); // HTML email content
+  const [isSending, setIsSending] = useState(false); // Loading state for sending emails
+
+  // Filter subscribers based on search term
+  const filteredSubscribers = subscribers.filter((sub) =>
+    sub.email.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  // Handle bulk delete
+  const handleBulkDelete = async () => {
+    const success = await bulkDeleteSubscribers(selectedEmails);
+    if (success) {
+      setNotification({
+        message: `Deleted ${selectedEmails.length} subscriber(s) successfully`,
+        type: "success",
+      });
+      setSelectedEmails([]);
+    } else {
+      setNotification({ message: "Failed to delete subscribers", type: "error" });
+    }
+  };
+
+  // Handle individual delete
+  const handleDelete = async (id) => {
+    const success = await deleteSubscriber(id);
+    if (success) {
+      setNotification({ message: "Subscriber deleted successfully", type: "success" });
+    } else {
+      setNotification({ message: "Failed to delete subscriber", type: "error" });
+    }
+  };
+
+  // Toggle email selection
+  const toggleEmailSelection = (id) => {
+    setSelectedEmails((prev) =>
+      prev.includes(id) ? prev.filter((e) => e !== id) : [...prev, id]
     );
+  };
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const subscriberData = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-      setSubscribers(subscriberData);
-      
-      // Calculate stats
-      const now = new Date();
-      const monthAgo = new Date(now.setMonth(now.getMonth() - 1));
-      
-      const activeSubscribers = subscriberData.filter(sub => sub.status === 'active');
-      const newSubscribers = subscriberData.filter(sub => 
-        new Date(sub.subscribedAt) > monthAgo
-      );
+  // Select all emails
+  const selectAllEmails = () => {
+    setSelectedEmails(filteredSubscribers.map((sub) => sub.id));
+  };
 
-      setStats({
-        totalSubscribers: activeSubscribers.length,
-        monthlyGrowth: newSubscribers.length,
-        openRate: 38.2, // Example engagement metrics
-        openRateChange: 2.1,
-        clickRate: 12.8,
-        clickRateChange: 0.6,
-        totalCampaigns: 32,
-        monthlyCampaigns: 4
+  // Handle sending email to all subscribers
+  const handleSendEmail = async () => {
+    if (!emailContent.trim()) {
+      setNotification({ message: "Please enter email content", type: "error" });
+      return;
+    }
+
+    setIsSending(true);
+    try {
+      const response = await fetch("/api/newsletter/send", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          emails: subscribers.map((sub) => sub.email),
+          htmlContent: emailContent,
+        }),
       });
 
-      setLoading(false);
-    });
+      const data = await response.json();
 
-    return () => unsubscribe();
-  }, []);
+      if (response.ok) {
+        setNotification({ message: "Emails sent successfully!", type: "success" });
+      } else {
+        setNotification({ message: data.error || "Failed to send emails", type: "error" });
+      }
+    } catch (err) {
+      setNotification({ message: "Failed to send emails", type: "error" });
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  // Clear notification after a delay
+  useEffect(() => {
+    if (notification.message) {
+      const timer = setTimeout(() => {
+        setNotification({ message: "", type: "" });
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [notification]);
 
   return (
     <AuthCheck>
       <AdminLayout>
-        <div className="space-y-6">
-          <div className="flex justify-between items-center">
-            <h1 className="text-3xl font-bold">Newsletter Management</h1>
-          </div>
-          
-          <NewsletterStats stats={stats} />
+        <div className="p-6 max-w-6xl mx-auto">
+          {/* Notification */}
+          {notification.message && (
+            <div
+              className={`mb-6 p-4 rounded-lg ${
+                notification.type === "success"
+                  ? "bg-green-100 text-green-700"
+                  : "bg-red-100 text-red-700"
+              }`}
+            >
+              {notification.message}
+            </div>
+          )}
 
-          <Tabs defaultValue="compose" className="space-y-4">
-            <TabsList>
-              <TabsTrigger value="compose">Compose</TabsTrigger>
-              <TabsTrigger value="subscribers">Subscribers</TabsTrigger>
-            </TabsList>
-            
-            <TabsContent value="compose" className="space-y-4">
-              <ComposeNewsletter />
-            </TabsContent>
-            
-            <TabsContent value="subscribers" className="space-y-4">
-              <SubscriberList subscribers={subscribers} loading={loading} />
-            </TabsContent>
-          </Tabs>
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
+            <h1 className="text-2xl font-bold mb-4 md:mb-0">
+              Newsletter Subscribers ({filteredSubscribers.length})
+            </h1>
+          </div>
+
+          {/* Email Content Input */}
+          <div className="mb-6">
+            <label className="block text-sm font-medium mb-2">Email Content (HTML)</label>
+            <textarea
+              value={emailContent}
+              onChange={(e) => setEmailContent(e.target.value)}
+              placeholder="Paste your HTML email content here..."
+              className="w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#46c7c7] h-48"
+            />
+            <button
+              onClick={handleSendEmail}
+              disabled={isSending || subscribers.length === 0}
+              className="mt-4 flex items-center px-4 py-2 bg-[#46c7c7] text-white rounded hover:bg-[#3aa8a8] disabled:opacity-50"
+            >
+              <FiSend className="mr-2" />
+              {isSending ? "Sending..." : `Send to ${subscribers.length} Subscribers`}
+            </button>
+          </div>
+
+          {/* Controls */}
+          <div className="mb-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="relative">
+              <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Search by email..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 border rounded-lg"
+              />
+            </div>
+            {selectedEmails.length > 0 && (
+              <button
+                onClick={handleBulkDelete}
+                className="flex items-center px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600"
+              >
+                <FiTrash2 className="mr-2" /> Delete Selected ({selectedEmails.length})
+              </button>
+            )}
+          </div>
+
+          {/* Subscribers Table */}
+          {loading ? (
+            <div className="text-center py-12">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#46c7c7] mx-auto"></div>
+            </div>
+          ) : error ? (
+            <div className="bg-red-100 border-l-4 border-red-500 p-4 rounded-lg">
+              <p className="text-red-700">{error}</p>
+            </div>
+          ) : filteredSubscribers.length === 0 ? (
+            <div className="text-center py-12 text-gray-500">
+              <FiMail className="text-4xl mx-auto mb-4" />
+              No subscribers found
+            </div>
+          ) : (
+            <div className="bg-white rounded-lg shadow overflow-hidden">
+              <table className="w-full">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                      <input
+                        type="checkbox"
+                        checked={selectedEmails.length === filteredSubscribers.length}
+                        onChange={selectAllEmails}
+                        className="form-checkbox h-4 w-4"
+                      />
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                      <FiUser className="inline mr-2" /> Email
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                      <FiCalendar className="inline mr-2" /> Subscribed
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {filteredSubscribers.map((sub) => (
+                    <tr key={sub.id}>
+                      <td className="px-6 py-4">
+                        <input
+                          type="checkbox"
+                          checked={selectedEmails.includes(sub.id)}
+                          onChange={() => toggleEmailSelection(sub.id)}
+                          className="form-checkbox h-4 w-4"
+                        />
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="text-sm font-medium text-gray-900">{sub.email}</div>
+                        {sub.name && <div className="text-sm text-gray-500">{sub.name}</div>}
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-500">{sub.createdAt}</td>
+                      <td className="px-6 py-4">
+                        <button
+                          onClick={() => handleDelete(sub.id)}
+                          className="text-red-500 hover:text-red-700"
+                        >
+                          <FiTrash2 className="inline" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       </AdminLayout>
     </AuthCheck>
