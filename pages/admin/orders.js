@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, useMemo, useCallback } from "react";
+import React, { useEffect, useState, useRef, useMemo, useCallback } from "react"; // Add React import
 import AdminLayout from "../../components/layout/AdminLayout";
 import AuthCheck from "../../components/auth/AuthCheck";
 import { db } from "../../lib/firebaseClient";
