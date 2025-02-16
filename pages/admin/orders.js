@@ -1,9 +1,9 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import AdminLayout from "../../components/layout/AdminLayout";
 import AuthCheck from "../../components/auth/AuthCheck";
 import { db } from "../../lib/firebaseClient";
-import { collection, onSnapshot, doc, updateDoc } from "firebase/firestore";
-import { FiPackage, FiTruck, FiClock, FiXCircle, FiCheckCircle, FiUser, FiPhone } from "react-icons/fi";
+import { collection, onSnapshot, doc, updateDoc, query, orderBy, limit } from "firebase/firestore";
+import { FiPackage, FiTruck, FiClock, FiXCircle, FiCheckCircle, FiUser, FiPhone, FiSearch } from "react-icons/fi";
 
 export default function Orders() {
   const [orders, setOrders] = useState([]);
@@ -11,55 +11,52 @@ export default function Orders() {
   const [error, setError] = useState(null);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [activeTab, setActiveTab] = useState("new");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [ordersPerPage] = useState(10);
 
-  // Ref for the modal
   const modalRef = useRef(null);
 
-  // Close modal when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (modalRef.current && !modalRef.current.contains(event.target)) {
-        setSelectedOrder(null); // Close the modal
+        setSelectedOrder(null);
       }
     };
 
-    // Add event listener when the modal is open
     if (selectedOrder) {
       document.addEventListener("mousedown", handleClickOutside);
     }
 
-    // Cleanup event listener
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, [selectedOrder]);
 
-  // Fetch orders from Firestore using onSnapshot for real-time updates
   useEffect(() => {
     const ordersCollection = collection(db, "orders");
+    const q = query(ordersCollection, orderBy("createdAt", "desc"), limit(ordersPerPage));
 
     const unsubscribe = onSnapshot(
-      ordersCollection,
+      q,
       (ordersSnapshot) => {
         const ordersData = ordersSnapshot.docs.map((doc) => ({
           id: doc.id,
           ...doc.data(),
         }));
         setOrders(ordersData);
-        setLoading(false); // Set loading to false after data is fetched
+        setLoading(false);
       },
       (err) => {
         setError("Failed to fetch orders.");
         console.error("Error fetching orders:", err);
-        setLoading(false); // Stop loading if an error occurs
+        setLoading(false);
       }
     );
 
-    // Cleanup the listener when component unmounts
     return () => unsubscribe();
-  }, []);
+  }, [currentPage, ordersPerPage]);
 
-  // Update order status
   const updateOrderStatus = async (orderId, newStatus) => {
     try {
       const orderDoc = doc(db, "orders", orderId);
@@ -76,13 +73,18 @@ export default function Orders() {
     }
   };
 
-  // Filter orders
-  const pendingOrders = orders.filter((order) => order.status === "Pending");
-  const shippedOrders = orders.filter((order) => order.status === "Shipped");
-  const newOrders = orders.filter((order) => order.status === "New");
+  const filteredOrders = useMemo(() => {
+    return orders.filter((order) =>
+      order.userInfo?.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      order.id.includes(searchQuery)
+    );
+  }, [orders, searchQuery]);
 
-  // Render Order Card
-  const renderOrderCard = (order) => (
+  const pendingOrders = filteredOrders.filter((order) => order.status === "Pending");
+  const shippedOrders = filteredOrders.filter((order) => order.status === "Shipped");
+  const newOrders = filteredOrders.filter((order) => order.status === "New");
+
+  const renderOrderCard = useCallback((order) => (
     <div
       key={order.id}
       onClick={() => setSelectedOrder(order)}
@@ -162,13 +164,12 @@ export default function Orders() {
         </button>
       </div>
     </div>
-  );
+  ), []);
 
-  // Modal for shipping information
   const renderShippingModal = () => (
     <div className="fixed inset-0 bg-black bg-opacity-30 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-scroll">
       <div
-        ref={modalRef} // Attach ref to the modal content
+        ref={modalRef}
         className="bg-white rounded-2xl p-8 max-w-2xl w-full space-y-6 shadow-xl"
       >
         <div className="flex justify-between items-start">
@@ -242,6 +243,12 @@ export default function Orders() {
     </div>
   );
 
+  const handlePageChange = (page) => {
+    setCurrentPage(page);
+  };
+
+  const totalPages = Math.ceil(filteredOrders.length / ordersPerPage);
+
   return (
     <AuthCheck>
       <AdminLayout>
@@ -263,6 +270,16 @@ export default function Orders() {
               </button>
             ))}
           </div>
+          <div className="relative flex items-center">
+            <FiSearch className="absolute left-3 text-gray-500" />
+            <input
+              type="text"
+              placeholder="Search orders..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10 pr-4 py-2 rounded-xl border border-gray-200 focus:outline-none focus:border-[#46c7c7]"
+            />
+          </div>
         </div>
 
         {loading && (
@@ -281,6 +298,24 @@ export default function Orders() {
           {(activeTab === "new" ? newOrders : activeTab === "shipped" ? shippedOrders : pendingOrders).map(
             renderOrderCard
           )}
+        </div>
+
+        <div className="flex justify-center mt-4">
+          <button
+            onClick={() => handlePageChange(currentPage - 1)}
+            disabled={currentPage === 1}
+            className="px-4 py-2 rounded-xl border border-gray-200 hover:bg-gray-100 disabled:opacity-50"
+          >
+            Previous
+          </button>
+          <span className="mx-4">Page {currentPage} of {totalPages}</span>
+          <button
+            onClick={() => handlePageChange(currentPage + 1)}
+            disabled={currentPage === totalPages}
+            className="px-4 py-2 rounded-xl border border-gray-200 hover:bg-gray-100 disabled:opacity-50"
+          >
+            Next
+          </button>
         </div>
 
         {selectedOrder && renderShippingModal()}

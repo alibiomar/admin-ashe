@@ -16,22 +16,22 @@ export default async function handler(req, res) {
     const orderStats = ordersSnapshot.docs.reduce((acc, doc) => {
       const order = doc.data();
       const amount = order.totalAmount || 0;
-      
+
       // Status breakdown
       acc.statusCounts[order.status] = (acc.statusCounts[order.status] || 0) + 1;
-      
+
       // Revenue calculations
       if (order.status === 'shipped') {
         acc.totalRevenue += amount;
         acc.shippedOrdersCount++;
       }
-      
+
       // Customer tracking
       if (order.userId) {
         acc.userIds.add(order.userId);
         acc.orderCountPerUser.set(order.userId, (acc.orderCountPerUser.get(order.userId) || 0) + 1);
       }
-      
+
       return acc;
     }, {
       totalRevenue: 0,
@@ -44,34 +44,38 @@ export default async function handler(req, res) {
     // Product Statistics
     const inventoryStats = productsSnapshot.docs.reduce((acc, doc) => {
       const product = doc.data();
-      if (product.stockQuantity <= 0) acc.outOfStock++;
-      if (product.stockQuantity > 0 && product.stockQuantity < 10) acc.lowStock++;
+      const stockQuantity = Object.values(product.stock).reduce((sum, quantity) => sum + quantity, 0);
+
+      if (stockQuantity <= 0) acc.outOfStock++;
+      if (stockQuantity > 0 && stockQuantity < 10) acc.lowStock++;
+
       return acc;
     }, { outOfStock: 0, lowStock: 0 });
 
     // Customer Statistics
     const uniqueCustomers = orderStats.userIds.size;
     const repeatCustomers = [...orderStats.orderCountPerUser.values()].filter(count => count > 1).length;
+    const newCustomers = uniqueCustomers - repeatCustomers;
 
     // Final metrics
     const stats = {
       // Order stats
       totalOrders: ordersSnapshot.size,
       totalRevenue: orderStats.totalRevenue,
-      averageOrderValue: orderStats.shippedOrdersCount > 0 
-        ? orderStats.totalRevenue / orderStats.shippedOrdersCount 
+      averageOrderValue: orderStats.shippedOrdersCount > 0
+        ? orderStats.totalRevenue / orderStats.shippedOrdersCount
         : 0,
       orderStatusBreakdown: orderStats.statusCounts,
-      
+
       // Customer stats
       totalCustomers: uniqueCustomers,
       repeatCustomers,
-      newCustomers: uniqueCustomers - repeatCustomers,
-      
+      newCustomers,
+
       // Product stats
       totalProducts: productsSnapshot.size,
       ...inventoryStats,
-      
+
       // Subscription stats
       totalSubscribers: subscribersSnapshot.size
     };

@@ -1,9 +1,9 @@
-import { useState } from "react";
+import { useState, useCallback, useEffect } from "react";
 import AdminLayout from "../../components/layout/AdminLayout";
 import AuthCheck from "../../components/auth/AuthCheck";
 import { db } from "../../lib/firebaseClient";
 import { collection, addDoc } from "firebase/firestore";
-import { FiTrash, FiPlus } from "react-icons/fi";
+import { FiTrash, FiPlus, FiUpload } from "react-icons/fi";
 
 export default function Products() {
   const [product, setProduct] = useState({
@@ -19,6 +19,7 @@ export default function Products() {
     { size: "", stock: "" }
   ]);
   const [loading, setLoading] = useState(false);
+  const [notification, setNotification] = useState({ message: "", type: "" });
 
   // Handle basic input changes
   const handleInputChange = (e) => {
@@ -72,7 +73,7 @@ export default function Products() {
       // Process sizes and stock
       const sizes = [];
       const stockMap = {};
-      
+
       sizeInputs.forEach(input => {
         const size = input.size.trim();
         if (size) {
@@ -91,7 +92,6 @@ export default function Products() {
       const productsCollection = collection(db, "products");
       await addDoc(productsCollection, {
         name: product.name,
-        index: product.index,
         description: product.description,
         price: parseFloat(product.price),
         images: product.images.filter(url => url.trim()),
@@ -110,27 +110,45 @@ export default function Products() {
         stock: {}
       });
       setSizeInputs([{ size: "", stock: "" }]);
-      
-      alert("Product added successfully!");
+
+      setNotification({ message: "Product added successfully!", type: "success" });
     } catch (error) {
       console.error("Error adding product:", error);
-      alert(error.message || "Failed to add product");
+      setNotification({ message: error.message || "Failed to add product", type: "error" });
     } finally {
       setLoading(false);
     }
   };
 
+  // Clear notification after a delay
+  useEffect(() => {
+    if (notification.message) {
+      const timer = setTimeout(() => {
+        setNotification({ message: "", type: "" });
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [notification]);
+
   return (
     <AuthCheck>
       <AdminLayout>
         <div className="p-6 max-w-4xl mx-auto">
+          {notification.message && (
+            <div className={`fixed top-4 right-4 z-50 animate-slide-in p-4 rounded-lg shadow-lg ${notification.type === "success" ? "bg-emerald-50 border border-emerald-200" : "bg-rose-50 border border-rose-200"}`}>
+              <span className={`text-sm ${notification.type === "success" ? "text-emerald-700" : "text-rose-700"}`}>
+                {notification.message}
+              </span>
+            </div>
+          )}
+
           <h1 className="text-3xl font-bold text-gray-800 mb-8">Add New Product</h1>
 
           <form onSubmit={handleSubmit} className="space-y-8">
             {/* Product Info Section */}
             <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
               <h2 className="text-lg font-semibold text-gray-700 mb-6">Product Information</h2>
-              
+
               <div className="space-y-6">
                 <div>
                   <label className="block text-sm font-medium text-gray-600 mb-2">Product Name</label>
@@ -138,17 +156,6 @@ export default function Products() {
                     type="text"
                     name="name"
                     value={product.name}
-                    onChange={handleInputChange}
-                    required
-                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#46c7c7] focus:border-[#46c7c7] transition-all"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-600 mb-2">Index</label>
-                  <input
-                    name="index"
-                    value={product.index}
                     onChange={handleInputChange}
                     required
                     className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#46c7c7] focus:border-[#46c7c7] transition-all"
@@ -220,46 +227,47 @@ export default function Products() {
               </div>
             </div>
 
+            {/* Sizes & Inventory Section */}
             <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 md:p-8">
-  <h2 className="text-lg font-semibold text-gray-700 mb-6 md:text-xl md:mb-8">Sizes & Inventory</h2>
-  <div className="space-y-4">
-    {sizeInputs.map((input, index) => (
-      <div key={index} className="flex flex-col md:flex-row gap-3 items-center md:items-start">
-        <input
-          type="text"
-          placeholder="Size (e.g., S/M/L)"
-          value={input.size}
-          onChange={(e) => handleSizeStockChange(index, "size", e.target.value)}
-          className="flex-1 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#46c7c7] focus:border-[#46c7c7] transition-all w-full md:w-auto"
-        />
-        <input
-          type="number"
-          placeholder="Stock"
-          value={input.stock}
-          onChange={(e) => handleSizeStockChange(index, "stock", e.target.value)}
-          className="w-full md:w-32 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#46c7c7] focus:border-[#46c7c7] transition-all mt-2 md:mt-0"
-        />
-        {index > 0 && (
-          <button
-            type="button"
-            onClick={() => removeSizeStockField(index)}
-            className="p-2 text-red-500 hover:bg-red-50 rounded-full transition-colors mt-2 md:mt-0"
-          >
-            <FiTrash className="w-5 h-5" />
-          </button>
-        )}
-      </div>
-    ))}
-    <button
-      type="button"
-      onClick={addSizeStockField}
-      className="flex items-center gap-2 text-[#46c7c7] hover:text-[#3aa8a8] font-medium py-2 px-4 rounded-lg border border-[#46c7c7] hover:border-[#3aa8a8] transition-all mt-4 w-full md:w-auto justify-center"
-    >
-      <FiPlus className="w-5 h-5" />
-      Add Size & Stock
-    </button>
-  </div>
-</div>
+              <h2 className="text-lg font-semibold text-gray-700 mb-6 md:text-xl md:mb-8">Sizes & Inventory</h2>
+              <div className="space-y-4">
+                {sizeInputs.map((input, index) => (
+                  <div key={index} className="flex flex-col md:flex-row gap-3 items-center md:items-start">
+                    <input
+                      type="text"
+                      placeholder="Size (e.g., S/M/L)"
+                      value={input.size}
+                      onChange={(e) => handleSizeStockChange(index, "size", e.target.value)}
+                      className="flex-1 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#46c7c7] focus:border-[#46c7c7] transition-all w-full md:w-auto"
+                    />
+                    <input
+                      type="number"
+                      placeholder="Stock"
+                      value={input.stock}
+                      onChange={(e) => handleSizeStockChange(index, "stock", e.target.value)}
+                      className="w-full md:w-32 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#46c7c7] focus:border-[#46c7c7] transition-all mt-2 md:mt-0"
+                    />
+                    {index > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => removeSizeStockField(index)}
+                        className="p-2 text-red-500 hover:bg-red-50 rounded-full transition-colors mt-2 md:mt-0"
+                      >
+                        <FiTrash className="w-5 h-5" />
+                      </button>
+                    )}
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  onClick={addSizeStockField}
+                  className="flex items-center gap-2 text-[#46c7c7] hover:text-[#3aa8a8] font-medium py-2 px-4 rounded-lg border border-[#46c7c7] hover:border-[#3aa8a8] transition-all mt-4 w-full md:w-auto justify-center"
+                >
+                  <FiPlus className="w-5 h-5" />
+                  Add Size & Stock
+                </button>
+              </div>
+            </div>
 
             {/* Submit Button */}
             <button

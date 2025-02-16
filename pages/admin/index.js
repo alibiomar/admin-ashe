@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import AdminLayout from '../../components/layout/AdminLayout';
 import AuthCheck from '../../components/auth/AuthCheck';
 
@@ -7,22 +7,22 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  useEffect(() => {
-    async function fetchStats() {
-      try {
-        const response = await fetch('/api/stats');
-        if (!response.ok) throw new Error('Failed to fetch stats');
-        const data = await response.json();
-        setStats(data);
-      } catch (err) {
-        setError(err.message);
-      } finally {
-        setLoading(false);
-      }
+  const fetchStats = useCallback(async () => {
+    try {
+      const response = await fetch('/api/stats');
+      if (!response.ok) throw new Error('Failed to fetch stats');
+      const data = await response.json();
+      setStats(data);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
     }
-
-    fetchStats();
   }, []);
+
+  useEffect(() => {
+    fetchStats();
+  }, [fetchStats]);
 
   return (
     <AuthCheck>
@@ -34,54 +34,17 @@ export default function Dashboard() {
           {error && <p className="text-red-500">{error}</p>}
           {stats && (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              <div className="p-4 border rounded-lg shadow">
-                <h2 className="text-xl font-semibold">Total Orders</h2>
-                <p>{stats.totalOrders}</p>
-              </div>
-              <div className="p-4 border rounded-lg shadow">
-                <h2 className="text-xl font-semibold">Total Revenue</h2>
-                <p>{stats.totalRevenue.toFixed(2)} TND</p>
-              </div>
-              <div className="p-4 border rounded-lg shadow">
-                <h2 className="text-xl font-semibold">Average Order Value</h2>
-                <p>{stats.averageOrderValue.toFixed(2)} TND</p>
-              </div>
-              <div className="p-4 border rounded-lg shadow">
-                <h2 className="text-xl font-semibold">Total Products</h2>
-                <p>{stats.totalProducts}</p>
-              </div>
-              <div className="p-4 border rounded-lg shadow">
-                <h2 className="text-xl font-semibold">Total Subscribers</h2>
-                <p>{stats.totalSubscribers}</p>
-              </div>
-              <div className="p-4 border rounded-lg shadow">
-                <h2 className="text-xl font-semibold">Total Customers</h2>
-                <p>{stats.totalCustomers}</p>
-              </div>
-              <div className="p-4 border rounded-lg shadow">
-                <h2 className="text-xl font-semibold">Repeat Customers</h2>
-                <p>{stats.repeatCustomers}</p>
-              </div>
-              <div className="p-4 border rounded-lg shadow">
-                <h2 className="text-xl font-semibold">New Customers</h2>
-                <p>{stats.newCustomers}</p>
-              </div>
-              <div className="p-4 border rounded-lg shadow">
-                <h2 className="text-xl font-semibold">Out of Stock Products</h2>
-                <p>{stats.outOfStock}</p>
-              </div>
-              <div className="p-4 border rounded-lg shadow">
-                <h2 className="text-xl font-semibold">Low Stock Products</h2>
-                <p>{stats.lowStock}</p>
-              </div>
-              <div className="p-4 border rounded-lg shadow">
-                <h2 className="text-xl font-semibold">Order Status Breakdown</h2>
-                <ul>
-                  {Object.entries(stats.orderStatusBreakdown).map(([status, count]) => (
-                    <li key={status}>{status}: {count}</li>
-                  ))}
-                </ul>
-              </div>
+              <StatCard title="Total Orders" value={stats.totalOrders} />
+              <StatCard title="Total Revenue" value={`${stats.totalRevenue.toFixed(2)} TND`} />
+              <StatCard title="Average Order Value" value={`${stats.averageOrderValue.toFixed(2)} TND`} />
+              <StatCard title="Total Products" value={stats.totalProducts} />
+              <StatCard title="Total Subscribers" value={stats.totalSubscribers} />
+              <StatCard title="Total Customers" value={stats.totalCustomers} />
+              <StatCard title="Repeat Customers" value={stats.repeatCustomers} />
+              <StatCard title="New Customers" value={stats.newCustomers} />
+              <StatCard title="Out of Stock Products" value={stats.outOfStock} />
+              <StatCard title="Low Stock Products" value={stats.lowStock} />
+              <OrderStatusBreakdown orderStatusBreakdown={stats.orderStatusBreakdown} />
             </div>
           )}
         </div>
@@ -89,3 +52,21 @@ export default function Dashboard() {
     </AuthCheck>
   );
 }
+
+const StatCard = ({ title, value }) => (
+  <div className="p-4 border rounded-lg shadow">
+    <h2 className="text-xl font-semibold">{title}</h2>
+    <p>{value}</p>
+  </div>
+);
+
+const OrderStatusBreakdown = ({ orderStatusBreakdown }) => (
+  <div className="p-4 border rounded-lg shadow">
+    <h2 className="text-xl font-semibold">Order Status Breakdown</h2>
+    <ul>
+      {Object.entries(orderStatusBreakdown).map(([status, count]) => (
+        <li key={status}>{status}: {count}</li>
+      ))}
+    </ul>
+  </div>
+);
