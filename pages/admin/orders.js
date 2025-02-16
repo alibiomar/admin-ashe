@@ -77,6 +77,7 @@ export default function Orders() {
   };
 
   // Filter orders
+  const pendingOrders = orders.filter((order) => order.status === "Pending");
   const shippedOrders = orders.filter((order) => order.status === "Shipped");
   const newOrders = orders.filter((order) => order.status === "New");
 
@@ -119,14 +120,18 @@ export default function Orders() {
           <div className="space-y-1">
             <label className="text-xs font-medium text-gray-400">STATUS</label>
             <div className={`inline-flex items-center px-3 py-1 rounded-full text-sm ${
-              order.status === "Shipped" 
+              order.status === "Shipped"
                 ? "bg-green-100 text-green-700"
                 : order.status === "New"
                 ? "bg-blue-100 text-blue-700"
+                : order.status === "Pending"
+                ? "bg-yellow-100 text-yellow-700"
                 : "bg-orange-100 text-orange-700"
             }`}>
               {order.status === "Shipped" ? (
                 <FiTruck className="mr-2" />
+              ) : order.status === "Pending" ? (
+                <FiClock className="mr-2" />
               ) : (
                 <FiClock className="mr-2" />
               )}
@@ -243,7 +248,7 @@ export default function Orders() {
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
           <h1 className="text-3xl font-bold text-gray-900">Order Management</h1>
           <div className="flex gap-2 bg-gray-100 p-1 rounded-xl">
-            {["new", "shipped"].map((tab) => (
+            {["new", "shipped", "pending"].map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
@@ -254,7 +259,7 @@ export default function Orders() {
                 }`}
               >
                 {tab.charAt(0).toUpperCase() + tab.slice(1)} (
-                {tab === "new" ? newOrders.length : shippedOrders.length})
+                {tab === "new" ? newOrders.length : tab === "shipped" ? shippedOrders.length : pendingOrders.length})
               </button>
             ))}
           </div>
@@ -273,7 +278,7 @@ export default function Orders() {
         )}
 
         <div className="space-y-4">
-          {(activeTab === "new" ? newOrders : shippedOrders).map(
+          {(activeTab === "new" ? newOrders : activeTab === "shipped" ? shippedOrders : pendingOrders).map(
             renderOrderCard
           )}
         </div>
