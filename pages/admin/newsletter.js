@@ -102,6 +102,14 @@ export default function Newsletter() {
   const [itemsPerPage] = useState(10); // Items per page
   const [showPreview, setShowPreview] = useState(false); // Email preview modal
 
+  // Deletion confirmation modal state
+  const [deleteConfirm, setDeleteConfirm] = useState({
+    show: false,
+    type: "", // 'single' or 'bulk'
+    id: null,
+    ids: [],
+  });
+
   // Filter subscribers based on search term
   const filteredSubscribers = subscribers.filter((sub) =>
     sub.email.toLowerCase().includes(searchTerm.toLowerCase())
@@ -113,43 +121,40 @@ export default function Newsletter() {
   const currentSubscribers = filteredSubscribers.slice(indexOfFirstItem, indexOfLastItem);
   const totalPages = Math.ceil(filteredSubscribers.length / itemsPerPage);
 
-  // Handle bulk delete
-  const handleBulkDelete = async () => {
-    const success = await bulkDeleteSubscribers(selectedEmails);
-    if (success) {
-      setNotification({
-        message: `Deleted ${selectedEmails.length} subscriber(s) successfully`,
-        type: "success",
-      });
-      setSelectedEmails([]);
-    } else {
-      setNotification({ message: "Failed to delete subscribers", type: "error" });
+  // Show confirmation modal before bulk deletion
+  const handleBulkDeleteConfirm = () => {
+    if (selectedEmails.length > 0) {
+      setDeleteConfirm({ show: true, type: "bulk", id: null, ids: selectedEmails });
     }
   };
 
-  // Handle individual delete
-  const handleDelete = async (id) => {
-    const success = await deleteSubscriber(id);
-    if (success) {
-      setNotification({ message: "Subscriber deleted successfully", type: "success" });
-    } else {
-      setNotification({ message: "Failed to delete subscriber", type: "error" });
+  // Show confirmation modal before single deletion
+  const handleDeleteConfirm = (id) => {
+    setDeleteConfirm({ show: true, type: "single", id, ids: [] });
+  };
+
+  // Confirm deletion (bulk or single)
+  const handleConfirmDelete = async () => {
+    if (deleteConfirm.type === "single") {
+      const success = await deleteSubscriber(deleteConfirm.id);
+      if (success) {
+        setNotification({ message: "Subscriber deleted successfully", type: "success" });
+      } else {
+        setNotification({ message: "Failed to delete subscriber", type: "error" });
+      }
+    } else if (deleteConfirm.type === "bulk") {
+      const success = await bulkDeleteSubscribers(deleteConfirm.ids);
+      if (success) {
+        setNotification({ message: `Deleted ${deleteConfirm.ids.length} subscriber(s) successfully`, type: "success" });
+        setSelectedEmails([]);
+      } else {
+        setNotification({ message: "Failed to delete subscribers", type: "error" });
+      }
     }
+    setDeleteConfirm({ show: false, type: "", id: null, ids: [] });
   };
 
-  // Toggle email selection
-  const toggleEmailSelection = (id) => {
-    setSelectedEmails((prev) =>
-      prev.includes(id) ? prev.filter((e) => e !== id) : [...prev, id]
-    );
-  };
-
-  // Select all emails
-  const selectAllEmails = () => {
-    setSelectedEmails(currentSubscribers.map((sub) => sub.id));
-  };
-
-  // Handle sending email to all subscribers
+  // Handle sending email (to selected if any, else broadcast to all)
   const handleSendEmail = async () => {
     if (!emailContent.trim()) {
       setNotification({ message: "Please enter email content", type: "error" });
@@ -158,13 +163,24 @@ export default function Newsletter() {
 
     setIsSending(true);
     try {
+      const targetSubscribers =
+        selectedEmails.length > 0
+          ? subscribers.filter((sub) => selectedEmails.includes(sub.id))
+          : subscribers;
+
+      if (targetSubscribers.length === 0) {
+        setNotification({ message: "No subscribers selected", type: "error" });
+        setIsSending(false);
+        return;
+      }
+
       const response = await fetch("/api/newsletter/send", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          emails: subscribers.map((sub) => sub.email),
+          emails: targetSubscribers.map((sub) => sub.email),
           htmlContent: emailContent,
         }),
       });
@@ -193,6 +209,18 @@ export default function Newsletter() {
     }
   }, [notification]);
 
+  // Toggle email selection
+  const toggleEmailSelection = (id) => {
+    setSelectedEmails((prev) =>
+      prev.includes(id) ? prev.filter((e) => e !== id) : [...prev, id]
+    );
+  };
+
+  // Select all emails on current page
+  const selectAllEmails = () => {
+    setSelectedEmails(currentSubscribers.map((sub) => sub.id));
+  };
+
   // Memoize the renderSubscriber function to prevent unnecessary re-renders
   const renderSubscriber = useCallback(
     (sub) => (
@@ -219,7 +247,7 @@ export default function Newsletter() {
         <td className="px-6 py-4 text-sm text-gray-500">{sub.timestamp}</td>
         <td className="px-6 py-4">
           <button
-            onClick={() => handleDelete(sub.id)}
+            onClick={() => handleDeleteConfirm(sub.id)}
             className="flex items-center text-gray-400 hover:text-rose-500 transition-colors"
           >
             <FiTrash2 className="w-5 h-5" />
@@ -322,7 +350,7 @@ export default function Newsletter() {
                   ) : (
                     <>
                       <FiSend className="w-5 h-5 mr-2" />
-                      Broadcast to All Subscribers
+                      {selectedEmails.length > 0 ? "Send to Selected" : "Broadcast to All Subscribers"}
                     </>
                   )}
                 </button>
@@ -336,7 +364,7 @@ export default function Newsletter() {
               <h3 className="text-lg font-semibold text-gray-800">Subscriber List</h3>
               {selectedEmails.length > 0 && (
                 <button
-                  onClick={handleBulkDelete}
+                  onClick={handleBulkDeleteConfirm}
                   className="flex items-center px-4 py-2 bg-rose-50 text-rose-700 rounded-lg hover:bg-rose-100 transition-all"
                 >
                   <FiTrash2 className="w-5 h-5 mr-2" />
@@ -436,6 +464,34 @@ export default function Newsletter() {
                   className="prose max-w-none"
                   dangerouslySetInnerHTML={{ __html: marked(emailContent) }}
                 />
+              </div>
+            </div>
+          )}
+
+          {/* Deletion Confirmation Modal */}
+          {deleteConfirm.show && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+              <div className="bg-white rounded-lg shadow-lg w-full max-w-md p-6">
+                <h3 className="text-lg font-semibold mb-4">Confirm Deletion</h3>
+                <p className="mb-6">
+                  {deleteConfirm.type === "bulk"
+                    ? `Are you sure you want to delete ${deleteConfirm.ids.length} subscriber(s)?`
+                    : "Are you sure you want to delete this subscriber?"}
+                </p>
+                <div className="flex justify-end gap-3">
+                  <button
+                    onClick={() => setDeleteConfirm({ show: false, type: "", id: null, ids: [] })}
+                    className="px-4 py-2 bg-gray-50 text-gray-700 rounded-lg hover:bg-gray-100"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleConfirmDelete}
+                    className="px-4 py-2 bg-rose-500 text-white rounded-lg hover:bg-rose-600"
+                  >
+                    Delete
+                  </button>
+                </div>
               </div>
             </div>
           )}
