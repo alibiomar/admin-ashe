@@ -46,21 +46,29 @@ export default function Dashboard() {
           {loading && <p>Loading stats...</p>}
           {error && <p className="text-red-500">{error}</p>}
           {stats && (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              <StatCard title="Total Orders" value={stats.totalOrders} />
-              <StatCard title="Total Revenue" value={`${stats.totalRevenue.toFixed(2)} TND`} />
-              <StatCard title="Average Order Value" value={`${stats.averageOrderValue.toFixed(2)} TND`} />
-              <StatCard title="Total Products" value={stats.totalProducts} />
-              <StatCard title="Total Subscribers" value={stats.totalSubscribers} />
-              <StatCard title="Total Customers" value={stats.totalCustomers} />
-              <StatCard title="Repeat Customers" value={stats.repeatCustomers} />
-              <StatCard title="New Customers" value={stats.newCustomers} />
-              <StatCard title="Out of Stock Products" value={stats.outOfStock} />
-              <StatCard title="Low Stock Products" value={stats.lowStock} />
-              <StatCard title="Online Users" value={onlineUsers.length} />
-              <OrderStatusBreakdown orderStatusBreakdown={stats.orderStatusBreakdown} />
-              <OnlineUsersList users={onlineUsers} />
-            </div>
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <StatCard title="Online Users" value={onlineUsers.length} />
+                <OnlineUsersList users={onlineUsers} />
+
+                <StatCard title="Total Orders" value={stats.totalOrders} />
+                <OrderStatusBreakdown orderStatusBreakdown={stats.orderStatusBreakdown} />
+
+                <StatCard
+                  title="Total Revenue"
+                  value={`${stats.totalRevenue.toFixed(2)} TND`}
+                />
+                <StatCard title="Total Products" value={stats.totalProducts} />
+                <StatCard title="Total Customers" value={stats.totalCustomers} />
+                <StatCard title="New Customers" value={stats.newCustomers} />
+                <StatCard title="Total Subscribers" value={stats.totalSubscribers} />
+              </div>
+
+              <div className="mt-8">
+                <h2 className="text-2xl font-bold mb-4">Out of Stock Products</h2>
+                <OutOfStockProductsTable products={stats.outOfStockProducts} />
+              </div>
+            </>
           )}
         </div>
       </AdminLayout>
@@ -80,7 +88,9 @@ const OrderStatusBreakdown = ({ orderStatusBreakdown }) => (
     <h2 className="text-xl font-semibold">Order Status Breakdown</h2>
     <ul>
       {Object.entries(orderStatusBreakdown).map(([status, count]) => (
-        <li key={status}>{status}: {count}</li>
+        <li key={status}>
+          {status}: {count}
+        </li>
       ))}
     </ul>
   </div>
@@ -90,9 +100,50 @@ const OnlineUsersList = ({ users }) => (
   <div className="p-4 border rounded-lg shadow">
     <h2 className="text-xl font-semibold">Online Users</h2>
     <ul>
-      {users.map(user => (
-        <li key={user.id}>{user.firstName} {user.lastName}</li>
+      {users.map((user) => (
+        <li key={user.id}>
+          {user.firstName} {user.lastName}
+        </li>
       ))}
     </ul>
   </div>
 );
+
+const OutOfStockProductsTable = ({ products }) => {
+  if (!products || products.length === 0) {
+    return <p>No out-of-stock products.</p>;
+  }
+
+  return (
+    <div className="overflow-x-auto">
+      <table className="min-w-full divide-y divide-gray-200">
+        <thead className="bg-gray-50">
+          <tr>
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              Product Name
+            </th>
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              Stock by Size
+            </th>
+          </tr>
+        </thead>
+        <tbody className="bg-white divide-y divide-gray-200">
+          {products.map((product, index) => (
+            <tr key={index}>
+              <td className="px-6 py-4 whitespace-nowrap">{product.name}</td>
+              <td className="px-6 py-4 whitespace-nowrap">
+                <ul>
+                  {Object.entries(product.stock).map(([size, quantity]) => (
+                    <li key={size}>
+                      {size}: {quantity}
+                    </li>
+                  ))}
+                </ul>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+};

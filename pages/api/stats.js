@@ -6,10 +6,11 @@ export default async function handler(req, res) {
   }
 
   try {
-    const [ordersSnapshot, productsSnapshot, subscribersSnapshot] = await Promise.all([
+    const [ordersSnapshot, productsSnapshot, subscribersSnapshot, usersSnapshot] = await Promise.all([
       adminDb.collection('orders').get(),
       adminDb.collection('products').get(),
-      adminDb.collection('newsletter_signups').get()
+      adminDb.collection('newsletter_signups').get(),
+      adminDb.collection('users').get()
     ]);
 
     // Order Statistics
@@ -20,61 +21,58 @@ export default async function handler(req, res) {
       // Status breakdown
       acc.statusCounts[order.status] = (acc.statusCounts[order.status] || 0) + 1;
 
-      // Revenue calculations
-      if (order.status === 'shipped') {
+      // Revenue calculations for shipped orders
+      if (order.status === 'Shipped') {
         acc.totalRevenue += amount;
         acc.shippedOrdersCount++;
-      }
-
-      // Customer tracking
-      if (order.userId) {
-        acc.userIds.add(order.userId);
-        acc.orderCountPerUser.set(order.userId, (acc.orderCountPerUser.get(order.userId) || 0) + 1);
       }
 
       return acc;
     }, {
       totalRevenue: 0,
       shippedOrdersCount: 0,
-      statusCounts: {},
-      userIds: new Set(),
-      orderCountPerUser: new Map()
+      statusCounts: {}
     });
 
-    // Product Statistics
-    const inventoryStats = productsSnapshot.docs.reduce((acc, doc) => {
+    // Product Statistics - Build a table for out-of-stock products
+    const outOfStockProducts = productsSnapshot.docs.reduce((acc, doc) => {
       const product = doc.data();
-      const stockQuantity = Object.values(product.stock).reduce((sum, quantity) => sum + quantity, 0);
+      // Assuming product.stock is an object like { small: 0, medium: 0, large: 0 }
+      const totalStock = Object.values(product.stock).reduce((sum, quantity) => sum + quantity, 0);
 
-      if (stockQuantity <= 0) acc.outOfStock++;
-      if (stockQuantity > 0 && stockQuantity < 10) acc.lowStock++;
-
+      if (totalStock <= 0) {
+        acc.push({
+          name: product.name,
+          stock: product.stock // e.g., { small: 0, medium: 0, large: 0 }
+        });
+      }
       return acc;
-    }, { outOfStock: 0, lowStock: 0 });
+    }, []);
 
     // Customer Statistics
-    const uniqueCustomers = orderStats.userIds.size;
-    const repeatCustomers = [...orderStats.orderCountPerUser.values()].filter(count => count > 1).length;
-    const newCustomers = uniqueCustomers - repeatCustomers;
+    const now = new Date();
+    const oneMonthAgo = new Date();
+    oneMonthAgo.setMonth(now.getMonth() - 1);
+
+    const uniqueCustomers = usersSnapshot.size;
+    const newCustomers = usersSnapshot.docs.filter(doc =>
+      doc.data().createdAt.toDate() >= oneMonthAgo
+    ).length;
 
     // Final metrics
     const stats = {
       // Order stats
       totalOrders: ordersSnapshot.size,
       totalRevenue: orderStats.totalRevenue,
-      averageOrderValue: orderStats.shippedOrdersCount > 0
-        ? orderStats.totalRevenue / orderStats.shippedOrdersCount
-        : 0,
       orderStatusBreakdown: orderStats.statusCounts,
 
       // Customer stats
       totalCustomers: uniqueCustomers,
-      repeatCustomers,
       newCustomers,
 
       // Product stats
       totalProducts: productsSnapshot.size,
-      ...inventoryStats,
+      outOfStockProducts, // Table of out-of-stock products
 
       // Subscription stats
       totalSubscribers: subscribersSnapshot.size

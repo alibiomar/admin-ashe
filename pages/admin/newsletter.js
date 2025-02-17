@@ -21,7 +21,7 @@ import {
   FiEye,
   FiX,
 } from "react-icons/fi";
-import { marked } from "marked"; // For markdown to HTML conversion (optional)
+import { marked } from "marked"; 
 
 // Flux-inspired state management
 const useNewsletterStore = () => {
@@ -101,7 +101,6 @@ export default function Newsletter() {
   const [currentPage, setCurrentPage] = useState(1); // Pagination state
   const [itemsPerPage] = useState(10); // Items per page
   const [showPreview, setShowPreview] = useState(false); // Email preview modal
-  const [exportLoading, setExportLoading] = useState(false); // Export loading state
 
   // Filter subscribers based on search term
   const filteredSubscribers = subscribers.filter((sub) =>
@@ -299,7 +298,7 @@ export default function Newsletter() {
               <span className="text-sm text-gray-500 mb-2 md:mb-0">
                 {emailContent.length} characters • {emailContent.split(/\s+/).length} words
               </span>
-              <div className="flex gap-3">
+              <div className="flex gap-3 flex-col md:flex-row">
                 <button
                   onClick={() => setShowPreview(true)}
                   className="flex items-center px-4 py-2 bg-gray-50 text-gray-700 rounded-lg hover:bg-gray-100 transition-all"
