@@ -49,7 +49,7 @@ export default function Dashboard() {
             <div className="space-y-12">
               {/* Section 1: Online Users */}
               <div className="flex flex-col md:flex-row items-start md:items-center gap-4">
-                <div className="flex-shrink-0 flex items-center justify-center w-16 h-16 rounded-full bg-blue-500 text-white text-2xl font-bold">
+                <div className="flex-shrink-0 flex items-center justify-center w-16 h-16 rounded-full bg-[#46c7c7] text-white text-2xl font-bold">
                   {onlineUsers.length}
                 </div>
                 <div className="overflow-x-auto w-full">
@@ -62,7 +62,7 @@ export default function Dashboard() {
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
-                      {onlineUsers.map(user => (
+                      {onlineUsers.map((user) => (
                         <tr key={user.id}>
                           <td className="px-6 py-4 whitespace-nowrap">
                             {user.firstName} {user.lastName}
@@ -149,6 +149,12 @@ export default function Dashboard() {
                   </tbody>
                 </table>
               </div>
+
+              {/* Section 5: Out-of-Stock Products */}
+              <div className="space-y-4">
+                <h2 className="text-2xl font-bold">Out-of-Stock Products</h2>
+                <OutOfStockProductsTable products={stats.outOfStockProducts} />
+              </div>
             </div>
           )}
         </div>
@@ -156,3 +162,42 @@ export default function Dashboard() {
     </AuthCheck>
   );
 }
+
+const OutOfStockProductsTable = ({ products }) => {
+  if (!products || products.length === 0) {
+    return <p>No out-of-stock products.</p>;
+  }
+
+  return (
+    <div className="overflow-x-auto">
+      <table className="min-w-full border border-gray-200 rounded-lg shadow">
+        <thead className="bg-gray-50">
+          <tr>
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              Product Name
+            </th>
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              Stock by Size
+            </th>
+          </tr>
+        </thead>
+        <tbody className="bg-white divide-y divide-gray-200">
+          {products.map((product, index) => (
+            <tr key={index}>
+              <td className="px-6 py-4 whitespace-nowrap">{product.name}</td>
+              <td className="px-6 py-4 whitespace-nowrap">
+                <ul>
+                  {Object.entries(product.stock).map(([size, quantity]) => (
+                    <li key={size}>
+                      {size}: {quantity}
+                    </li>
+                  ))}
+                </ul>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+};
