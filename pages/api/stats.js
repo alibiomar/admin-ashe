@@ -55,9 +55,14 @@ export default async function handler(req, res) {
     oneMonthAgo.setMonth(now.getMonth() - 1);
 
     const uniqueCustomers = usersSnapshot.size;
-    const newCustomers = usersSnapshot.docs.filter(doc =>
-      doc.data().createdAt.toDate() >= oneMonthAgo
-    ).length;
+    const newCustomers = usersSnapshot.docs.filter(doc => {
+      const { createdAt } = doc.data();
+      // Convert createdAt to a Date instance whether it's a Timestamp or a string
+      const createdAtDate = createdAt && typeof createdAt.toDate === 'function'
+        ? createdAt.toDate()
+        : new Date(createdAt);
+      return createdAtDate >= oneMonthAgo;
+    }).length;
 
     // Final metrics
     const stats = {
