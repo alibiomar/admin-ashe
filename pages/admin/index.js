@@ -20,7 +20,7 @@ export default function Dashboard() {
       setLoading(false);
     }
   }, []);
-
+  
   const fetchOnlineUsers = useCallback(async () => {
     try {
       const response = await fetch('/api/online-users');
