@@ -34,16 +34,16 @@ export default async function handler(req, res) {
       statusCounts: {}
     });
 
-    // Product Statistics - Build a table for out-of-stock products
+    // Product Statistics - Build a table for products with ANY size out of stock
     const outOfStockProducts = productsSnapshot.docs.reduce((acc, doc) => {
       const product = doc.data();
-      // Assuming product.stock is an object like { small: 0, medium: 0, large: 0 }
-      const totalStock = Object.values(product.stock).reduce((sum, quantity) => sum + quantity, 0);
+      // Check if ANY size has stock <= 0
+      const hasOutOfStockSize = Object.values(product.stock).some(quantity => quantity <= 0);
 
-      if (totalStock <= 0) {
+      if (hasOutOfStockSize) {
         acc.push({
           name: product.name,
-          stock: product.stock // e.g., { small: 0, medium: 0, large: 0 }
+          stock: product.stock // e.g., { L:1, M:1, S:1, XL:0 }
         });
       }
       return acc;
@@ -51,16 +51,12 @@ export default async function handler(req, res) {
 
     // Customer Statistics
     const now = new Date();
-    const oneMonthAgo = new Date();
-    oneMonthAgo.setMonth(now.getMonth() - 1);
+    const oneMonthAgo = new Date(now.setMonth(now.getMonth() - 1));
 
     const uniqueCustomers = usersSnapshot.size;
     const newCustomers = usersSnapshot.docs.filter(doc => {
       const { createdAt } = doc.data();
-      // Convert createdAt to a Date instance whether it's a Timestamp or a string
-      const createdAtDate = createdAt && typeof createdAt.toDate === 'function'
-        ? createdAt.toDate()
-        : new Date(createdAt);
+      const createdAtDate = createdAt?.toDate ? createdAt.toDate() : new Date(createdAt);
       return createdAtDate >= oneMonthAgo;
     }).length;
 
