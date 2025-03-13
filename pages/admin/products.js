@@ -39,10 +39,18 @@ export default function Products() {
     setProduct(prev => ({ ...prev, [name]: value }));
   };
 
+  const convertGoogleDriveLink = (url) => {
+    const match = url.match(/\/d\/(.*)\/view\?/);
+    if (match && match[1]) {
+      return `https://drive.google.com/uc?export=view&id=${match[1]}`;
+    }
+    return url; // Return original URL if it's not a Google Drive link
+  };
+
   // Handle image URL changes
   const handleImageChange = (index, value) => {
     const newImages = [...product.images];
-    newImages[index] = value;
+    newImages[index] = convertGoogleDriveLink(value);
     setProduct(prev => ({ ...prev, images: newImages }));
   };
 
