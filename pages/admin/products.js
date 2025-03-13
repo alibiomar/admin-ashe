@@ -13,12 +13,23 @@ export default function Products() {
     price: "",
     images: [""],
     sizes: [],
-    stock: {}
+    colors: [],
+    stock: {},
+    colorSizeStock: {}
   });
 
   const [sizeInputs, setSizeInputs] = useState([
     { size: "", stock: "" }
   ]);
+  
+  const [colorInputs, setColorInputs] = useState([
+    { color: "", displayName: "" }
+  ]);
+  
+  const [colorSizeStockInputs, setColorSizeStockInputs] = useState([
+    { color: "", size: "", stock: "" }
+  ]);
+  
   const [loading, setLoading] = useState(false);
   const [notification, setNotification] = useState({ message: "", type: "" });
 
@@ -40,6 +51,20 @@ export default function Products() {
     const newSizeInputs = [...sizeInputs];
     newSizeInputs[index][field] = value;
     setSizeInputs(newSizeInputs);
+  };
+  
+  // Handle color input changes
+  const handleColorChange = (index, field, value) => {
+    const newColorInputs = [...colorInputs];
+    newColorInputs[index][field] = value;
+    setColorInputs(newColorInputs);
+  };
+  
+  // Handle color-size-stock input changes
+  const handleColorSizeStockChange = (index, field, value) => {
+    const newInputs = [...colorSizeStockInputs];
+    newInputs[index][field] = value;
+    setColorSizeStockInputs(newInputs);
   };
 
   // Add new image field
@@ -64,6 +89,26 @@ export default function Products() {
   const removeSizeStockField = (index) => {
     setSizeInputs(prev => prev.filter((_, i) => i !== index));
   };
+  
+  // Add new color field
+  const addColorField = () => {
+    setColorInputs(prev => [...prev, { color: "", displayName: "" }]);
+  };
+  
+  // Remove color field
+  const removeColorField = (index) => {
+    setColorInputs(prev => prev.filter((_, i) => i !== index));
+  };
+  
+  // Add new color-size-stock field
+  const addColorSizeStockField = () => {
+    setColorSizeStockInputs(prev => [...prev, { color: "", size: "", stock: "" }]);
+  };
+  
+  // Remove color-size-stock field
+  const removeColorSizeStockField = (index) => {
+    setColorSizeStockInputs(prev => prev.filter((_, i) => i !== index));
+  };
 
   // Handle form submission
   const handleSubmit = async (e) => {
@@ -83,10 +128,41 @@ export default function Products() {
         }
       });
 
+      // Process colors
+      const colors = [];
+      const colorMap = {};
+
+      colorInputs.forEach(input => {
+        const color = input.color.trim();
+        if (color) {
+          colors.push(color);
+          colorMap[color] = input.displayName.trim() || color;
+        }
+      });
+      
+      // Process color-size-stock combinations
+      const colorSizeStock = {};
+      
+      colorSizeStockInputs.forEach(input => {
+        const color = input.color.trim();
+        const size = input.size.trim();
+        
+        if (color && size) {
+          const key = `${color}-${size}`;
+          colorSizeStock[key] = Number(input.stock) || 0;
+        }
+      });
+
       // Validate sizes
       const uniqueSizes = [...new Set(sizes)];
       if (sizes.length !== uniqueSizes.length) {
         throw new Error("Duplicate sizes found");
+      }
+      
+      // Validate colors
+      const uniqueColors = [...new Set(colors)];
+      if (colors.length !== uniqueColors.length) {
+        throw new Error("Duplicate colors found");
       }
 
       // Add product to Firestore
@@ -98,7 +174,10 @@ export default function Products() {
         price: parseFloat(product.price),
         images: product.images.filter(url => url.trim()),
         sizes: uniqueSizes,
-        stock: stockMap,
+        colors: uniqueColors,
+        stock: stockMap, // Keeping for backward compatibility
+        colorNames: colorMap, // Optional - for display names
+        colorSizeStock: colorSizeStock, // New structure for color+size inventory
         createdAt: new Date()
       });
 
@@ -110,9 +189,13 @@ export default function Products() {
         index: "",
         images: [""],
         sizes: [],
-        stock: {}
+        colors: [],
+        stock: {},
+        colorSizeStock: {}
       });
       setSizeInputs([{ size: "", stock: "" }]);
+      setColorInputs([{ color: "", displayName: "" }]);
+      setColorSizeStockInputs([{ color: "", size: "", stock: "" }]);
 
       setNotification({ message: "Product added successfully!", type: "success" });
     } catch (error) {
@@ -246,9 +329,58 @@ export default function Products() {
               </div>
             </div>
 
+            {/* Colors Section */}
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 md:p-8">
+              <h2 className="text-lg font-semibold text-gray-700 mb-6 md:text-xl md:mb-8">Colors</h2>
+              <div className="space-y-4">
+                {colorInputs.map((input, index) => (
+                  <div key={index} className="flex flex-col md:flex-row gap-3 items-center md:items-start">
+                    <input
+                      type="text"
+                      placeholder="Color code (e.g., #FF0000 or red)"
+                      value={input.color}
+                      onChange={(e) => handleColorChange(index, "color", e.target.value)}
+                      className="flex-1 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#46c7c7] focus:border-[#46c7c7] transition-all w-full md:w-auto"
+                    />
+                    <input
+                      type="text"
+                      placeholder="Display name (optional)"
+                      value={input.displayName}
+                      onChange={(e) => handleColorChange(index, "displayName", e.target.value)}
+                      className="w-full md:w-48 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#46c7c7] focus:border-[#46c7c7] transition-all mt-2 md:mt-0"
+                    />
+                    {input.color && (
+                      <div 
+                        className="w-10 h-10 border border-gray-300 rounded-lg mt-2 md:mt-1"
+                        style={{ backgroundColor: input.color }}
+                        aria-label={`Color preview: ${input.color}`}
+                      ></div>
+                    )}
+                    {index > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => removeColorField(index)}
+                        className="p-2 text-red-500 hover:bg-red-50 rounded-full transition-colors mt-2 md:mt-0"
+                      >
+                        <FiTrash className="w-5 h-5" />
+                      </button>
+                    )}
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  onClick={addColorField}
+                  className="flex items-center gap-2 text-[#46c7c7] hover:text-[#3aa8a8] font-medium py-2 px-4 rounded-lg border border-[#46c7c7] hover:border-[#3aa8a8] transition-all mt-4 w-full md:w-auto justify-center"
+                >
+                  <FiPlus className="w-5 h-5" />
+                  Add Color
+                </button>
+              </div>
+            </div>
+
             {/* Sizes & Inventory Section */}
             <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 md:p-8">
-              <h2 className="text-lg font-semibold text-gray-700 mb-6 md:text-xl md:mb-8">Sizes & Inventory</h2>
+              <h2 className="text-lg font-semibold text-gray-700 mb-6 md:text-xl md:mb-8">Sizes</h2>
               <div className="space-y-4">
                 {sizeInputs.map((input, index) => (
                   <div key={index} className="flex flex-col md:flex-row gap-3 items-center md:items-start">
@@ -261,7 +393,7 @@ export default function Products() {
                     />
                     <input
                       type="number"
-                      placeholder="Stock"
+                      placeholder="Default Stock"
                       value={input.stock}
                       onChange={(e) => handleSizeStockChange(index, "stock", e.target.value)}
                       className="w-full md:w-32 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#46c7c7] focus:border-[#46c7c7] transition-all mt-2 md:mt-0"
@@ -283,9 +415,83 @@ export default function Products() {
                   className="flex items-center gap-2 text-[#46c7c7] hover:text-[#3aa8a8] font-medium py-2 px-4 rounded-lg border border-[#46c7c7] hover:border-[#3aa8a8] transition-all mt-4 w-full md:w-auto justify-center"
                 >
                   <FiPlus className="w-5 h-5" />
-                  Add Size & Stock
+                  Add Size
                 </button>
               </div>
+            </div>
+            
+            {/* Color-Size Stock Combinations */}
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 md:p-8">
+              <h2 className="text-lg font-semibold text-gray-700 mb-6 md:text-xl md:mb-8">Color & Size Inventory</h2>
+              
+              {colorInputs.length === 0 || sizeInputs.length === 0 ? (
+                <div className="text-amber-600 bg-amber-50 p-4 rounded-lg">
+                  Please add at least one color and one size before setting inventory.
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {colorSizeStockInputs.map((input, index) => (
+                    <div key={index} className="flex flex-col md:flex-row gap-3 items-center md:items-start">
+                      <select
+                        value={input.color}
+                        onChange={(e) => handleColorSizeStockChange(index, "color", e.target.value)}
+                        className="flex-1 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#46c7c7] focus:border-[#46c7c7] transition-all"
+                      >
+                        <option value="">Select Color</option>
+                        {colorInputs.map((colorInput, cidx) => 
+                          colorInput.color ? (
+                            <option key={`color-opt-${cidx}`} value={colorInput.color}>
+                              {colorInput.displayName || colorInput.color}
+                            </option>
+                          ) : null
+                        ).filter(Boolean)}
+                      </select>
+                      
+                      <select
+                        value={input.size}
+                        onChange={(e) => handleColorSizeStockChange(index, "size", e.target.value)}
+                        className="flex-1 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#46c7c7] focus:border-[#46c7c7] transition-all"
+                      >
+                        <option value="">Select Size</option>
+                        {sizeInputs.map((sizeInput, sidx) => 
+                          sizeInput.size ? (
+                            <option key={`size-opt-${sidx}`} value={sizeInput.size}>
+                              {sizeInput.size}
+                            </option>
+                          ) : null
+                        ).filter(Boolean)}
+                      </select>
+                      
+                      <input
+                        type="number"
+                        placeholder="Stock"
+                        value={input.stock}
+                        onChange={(e) => handleColorSizeStockChange(index, "stock", e.target.value)}
+                        className="w-full md:w-32 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#46c7c7] focus:border-[#46c7c7] transition-all"
+                      />
+                      
+                      {index > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => removeColorSizeStockField(index)}
+                          className="p-2 text-red-500 hover:bg-red-50 rounded-full transition-colors"
+                        >
+                          <FiTrash className="w-5 h-5" />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                  
+                  <button
+                    type="button"
+                    onClick={addColorSizeStockField}
+                    className="flex items-center gap-2 text-[#46c7c7] hover:text-[#3aa8a8] font-medium py-2 px-4 rounded-lg border border-[#46c7c7] hover:border-[#3aa8a8] transition-all mt-4 w-full md:w-auto justify-center"
+                  >
+                    <FiPlus className="w-5 h-5" />
+                    Add Color-Size Combination
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Submit Button */}
