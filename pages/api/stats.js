@@ -39,7 +39,6 @@ export default async function handler(req, res) {
       statusCounts: {}
     });
 
-    // Product Statistics - Build a table for products with ANY size out of stock.
     // Adapted for the new structure where stock is nested under each color.
     // Product Statistics - Build a table for products with ANY size out of stock.
 const outOfStockProducts = productsSnapshot.docs.reduce((acc, doc) => {

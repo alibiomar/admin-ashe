@@ -177,7 +177,7 @@ const OutOfStockProductsTable = ({ products }) => {
               Product Name
             </th>
             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-              Stock by Size
+              Out-of-Stock Details
             </th>
           </tr>
         </thead>
@@ -186,13 +186,16 @@ const OutOfStockProductsTable = ({ products }) => {
             <tr key={index}>
               <td className="px-6 py-4 whitespace-nowrap">{product.name}</td>
               <td className="px-6 py-4 whitespace-nowrap">
-                <ul>
-                  {Object.entries(product.stock).map(([size, quantity]) => (
-                    <li key={size}>
-                      {size}: {quantity}
-                    </li>
-                  ))}
-                </ul>
+                {product.outOfStockDetails.map((detail, idx) => (
+                  <div key={idx}>
+                    <strong>{detail.color}</strong>:{" "}
+                    {Object.entries(detail.outOfStockSizes).map(([size, quantity]) => (
+                      <span key={size} className="mr-2">
+                        {size} ({quantity})
+                      </span>
+                    ))}
+                  </div>
+                ))}
               </td>
             </tr>
           ))}
