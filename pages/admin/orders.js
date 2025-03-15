@@ -219,8 +219,9 @@ export default function Orders() {
               {selectedOrder.shippingInfo ? (
                 <div className="space-y-2 text-sm">
                   <p>{selectedOrder.shippingInfo.addressLine}</p>
-                  <p>{selectedOrder.shippingInfo.city}, {selectedOrder.shippingInfo.state}</p>
-                  <p>{selectedOrder.shippingInfo.zipCode}</p>
+                  <p>
+                    {selectedOrder.shippingInfo.district}, {selectedOrder.shippingInfo.delegation}, {selectedOrder.shippingInfo.governorate}
+                  </p>
                 </div>
               ) : (
                 <p className="text-gray-400">No shipping information</p>
@@ -236,10 +237,12 @@ export default function Orders() {
               </h4>
               <div className="space-y-3">
                 {selectedOrder.items?.map((item, index) => (
-                  <div key={index} className="flex justify-between items-center bg-white p-3 rounded-lg">
+                  <div key={index} className="flex flex-col md:flex-row justify-between items-center bg-white p-3 rounded-lg">
                     <div>
                       <p className="font-medium">{item.name}</p>
-                      <p className="text-xs text-gray-500">Size: {item.size || "N/A"}</p>
+                      <p className="text-xs text-gray-500">
+                        Size: {item.size || "N/A"} {item.color ? `| Color: ${item.color}` : ""}
+                      </p>
                     </div>
                     <span className="font-medium">TND {item.price?.toFixed(2)}</span>
                   </div>
