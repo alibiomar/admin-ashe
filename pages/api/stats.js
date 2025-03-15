@@ -6,7 +6,12 @@ export default async function handler(req, res) {
   }
 
   try {
-    const [ordersSnapshot, productsSnapshot, subscribersSnapshot, usersSnapshot] = await Promise.all([
+    const [
+      ordersSnapshot,
+      productsSnapshot,
+      subscribersSnapshot,
+      usersSnapshot
+    ] = await Promise.all([
       adminDb.collection('orders').get(),
       adminDb.collection('products').get(),
       adminDb.collection('newsletter_signups').get(),
@@ -34,16 +39,31 @@ export default async function handler(req, res) {
       statusCounts: {}
     });
 
-    // Product Statistics - Build a table for products with ANY size out of stock
+    // Product Statistics - Build a table for products with ANY size out of stock.
+    // Adapted for the new structure where stock is nested under each color.
     const outOfStockProducts = productsSnapshot.docs.reduce((acc, doc) => {
       const product = doc.data();
-      // Check if ANY size has stock <= 0
-      const hasOutOfStockSize = Object.values(product.stock).some(quantity => quantity <= 0);
 
-      if (hasOutOfStockSize) {
+      // Iterate through each color and check stock for each size.
+      const colorsOutOfStock = product.colors.map(color => {
+        // Find sizes with insufficient stock (<= 0)
+        const outOfStockSizes = Object.entries(color.stock || {}).filter(([size, qty]) => qty <= 0);
+        if (outOfStockSizes.length > 0) {
+          return {
+            color: color.name,
+            outOfStockSizes: outOfStockSizes.reduce((obj, [size, qty]) => {
+              obj[size] = qty;
+              return obj;
+            }, {})
+          };
+        }
+        return null;
+      }).filter(colorInfo => colorInfo !== null);
+
+      if (colorsOutOfStock.length > 0) {
         acc.push({
           name: product.name,
-          stock: product.stock // e.g., { L:1, M:1, S:1, XL:0 }
+          outOfStockDetails: colorsOutOfStock // Each entry includes the color and the sizes out of stock.
         });
       }
       return acc;
@@ -73,7 +93,7 @@ export default async function handler(req, res) {
 
       // Product stats
       totalProducts: productsSnapshot.size,
-      outOfStockProducts, // Table of out-of-stock products
+      outOfStockProducts, // Table of out-of-stock products with color and size details
 
       // Subscription stats
       totalSubscribers: subscribersSnapshot.size
