@@ -41,33 +41,39 @@ export default async function handler(req, res) {
 
     // Product Statistics - Build a table for products with ANY size out of stock.
     // Adapted for the new structure where stock is nested under each color.
-    const outOfStockProducts = productsSnapshot.docs.reduce((acc, doc) => {
-      const product = doc.data();
+    // Product Statistics - Build a table for products with ANY size out of stock.
+const outOfStockProducts = productsSnapshot.docs.reduce((acc, doc) => {
+  const product = doc.data();
 
-      // Iterate through each color and check stock for each size.
-      const colorsOutOfStock = product.colors.map(color => {
-        // Find sizes with insufficient stock (<= 0)
-        const outOfStockSizes = Object.entries(color.stock || {}).filter(([size, qty]) => qty <= 0);
-        if (outOfStockSizes.length > 0) {
-          return {
-            color: color.name,
-            outOfStockSizes: outOfStockSizes.reduce((obj, [size, qty]) => {
-              obj[size] = qty;
-              return obj;
-            }, {})
-          };
-        }
-        return null;
-      }).filter(colorInfo => colorInfo !== null);
+  // Ensure product.colors is a valid array
+  if (!Array.isArray(product.colors)) return acc;
 
-      if (colorsOutOfStock.length > 0) {
-        acc.push({
-          name: product.name,
-          outOfStockDetails: colorsOutOfStock // Each entry includes the color and the sizes out of stock.
-        });
-      }
-      return acc;
-    }, []);
+  // Iterate through each color and check stock for each size.
+  const colorsOutOfStock = product.colors.map(color => {
+    // Ensure color.stock exists as an object
+    const stock = color.stock || {};
+    const outOfStockSizes = Object.entries(stock).filter(([size, qty]) => qty <= 0);
+    if (outOfStockSizes.length > 0) {
+      return {
+        color: color.name,
+        outOfStockSizes: outOfStockSizes.reduce((obj, [size, qty]) => {
+          obj[size] = qty;
+          return obj;
+        }, {})
+      };
+    }
+    return null;
+  }).filter(colorInfo => colorInfo !== null);
+
+  if (colorsOutOfStock.length > 0) {
+    acc.push({
+      name: product.name,
+      outOfStockDetails: colorsOutOfStock
+    });
+  }
+  return acc;
+}, []);
+
 
     // Customer Statistics
     const now = new Date();
