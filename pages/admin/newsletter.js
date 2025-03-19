@@ -182,11 +182,11 @@ export default function Newsletter() {
     }
   
     setIsSending(true);
+  
     try {
-      const targetSubscribers =
-        selectedEmails.length > 0
-          ? subscribers.filter((sub) => selectedEmails.includes(sub.id))
-          : subscribers;
+      const targetSubscribers = selectedEmails.length > 0 
+        ? subscribers.filter((sub) => selectedEmails.includes(sub.id)) 
+        : subscribers;
   
       if (targetSubscribers.length === 0) {
         setNotification({ message: "No subscribers selected", type: "error" });
@@ -194,24 +194,32 @@ export default function Newsletter() {
         return;
       }
   
-      const response = await fetch("/api/newsletter/send", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          subject: emailSubject, // Send subject
-          emails: targetSubscribers.map((sub) => sub.email),
-          htmlContent: emailContent,
-        }),
-      });
+      // **Batch Sending (5 at a time)**
+      for (let i = 0; i < targetSubscribers.length; i += 5) {
+        const batch = targetSubscribers.slice(i, i + 5);
   
-      const data = await response.json();
+        const response = await fetch("/api/newsletter/send", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            subject: emailSubject,
+            emails: batch.map((sub) => sub.email),
+            htmlContent: emailContent,
+          }),
+        });
   
-      if (response.ok) {
-        setNotification({ message: "Emails sent successfully!", type: "success" });
-      } else {
-        setNotification({ message: data.error || "Failed to send emails", type: "error" });
+        const data = await response.json();
+        
+        if (!response.ok) {
+          setNotification({ message: data.error || `Failed to send batch ${i / 5 + 1}`, type: "error" });
+        } else {
+          setNotification({ message: `Batch ${i / 5 + 1} sent successfully`, type: "success" });
+        }
+  
+        // **Optional: Delay Between Batches to Avoid Spam Filters**
+        await new Promise((resolve) => setTimeout(resolve, 2000));
       }
     } catch (err) {
       setNotification({ message: "Failed to send emails", type: "error" });
