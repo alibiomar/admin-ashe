@@ -1,7 +1,7 @@
 // pages/api/sendEmail.js
 
 import nodemailer from 'nodemailer';
-import { db } from '../../../lib/firebaseAdmin'; // Firebase setup
+import { adminDb } from '../../../lib/firebaseAdmin'; // Firebase setup
 
 // Create a reusable Nodemailer transporter
 const transporter = nodemailer.createTransport({
@@ -26,7 +26,7 @@ const sendEmail = async (to, subject, htmlContent) => {
 
 // Store email job in Firestore
 const storeEmailJob = async (emails, subject, htmlContent) => {
-  const jobRef = db.collection('email_jobs').doc();
+  const jobRef = adminDb.collection('email_jobs').doc();
   await jobRef.set({
     emails,
     subject,

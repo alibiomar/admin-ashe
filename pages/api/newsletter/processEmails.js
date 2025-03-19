@@ -1,6 +1,6 @@
 // pages/api/processEmails.js
 
-import { db } from '../../../lib/firebaseAdmin'; // Firebase setup
+import { adminDb } from '../../../lib/firebaseAdmin'; // Firebase setup
 import nodemailer from 'nodemailer';
 
 const transporter = nodemailer.createTransport({
@@ -31,7 +31,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const jobRef = db.collection('email_jobs').doc(jobId);
+    const jobRef = adminDb.collection('email_jobs').doc(jobId);
     const jobSnapshot = await jobRef.get();
 
     if (!jobSnapshot.exists) {
