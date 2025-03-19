@@ -101,6 +101,7 @@ export default function Newsletter() {
   const [currentPage, setCurrentPage] = useState(1); // Pagination state
   const [itemsPerPage] = useState(10); // Items per page
   const [showPreview, setShowPreview] = useState(false); // Email preview modal
+  const [emailSubject, setEmailSubject] = useState(""); // Subject state
 
   // Deletion confirmation modal state
   const [deleteConfirm, setDeleteConfirm] = useState({
@@ -156,37 +157,38 @@ export default function Newsletter() {
 
   // Handle sending email (to selected if any, else broadcast to all)
   const handleSendEmail = async () => {
-    if (!emailContent.trim()) {
-      setNotification({ message: "Please enter email content", type: "error" });
+    if (!emailSubject.trim() || !emailContent.trim()) {
+      setNotification({ message: "Please enter both subject and content", type: "error" });
       return;
     }
-
+  
     setIsSending(true);
     try {
       const targetSubscribers =
         selectedEmails.length > 0
           ? subscribers.filter((sub) => selectedEmails.includes(sub.id))
           : subscribers;
-
+  
       if (targetSubscribers.length === 0) {
         setNotification({ message: "No subscribers selected", type: "error" });
         setIsSending(false);
         return;
       }
-
+  
       const response = await fetch("/api/newsletter/send", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
+          subject: emailSubject, // Send subject
           emails: targetSubscribers.map((sub) => sub.email),
           htmlContent: emailContent,
         }),
       });
-
+  
       const data = await response.json();
-
+  
       if (response.ok) {
         setNotification({ message: "Emails sent successfully!", type: "success" });
       } else {
@@ -198,6 +200,7 @@ export default function Newsletter() {
       setIsSending(false);
     }
   };
+  
 
   // Clear notification after a delay
   useEffect(() => {
@@ -312,51 +315,70 @@ export default function Newsletter() {
 
           {/* Email Composition Card */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-8">
-            <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-              <FiSend className="w-5 h-5 text-[#46c7c7]" />
-              Compose Newsletter
-            </h2>
-            <textarea
-              value={emailContent}
-              onChange={(e) => setEmailContent(e.target.value)}
-              placeholder="Write your HTML email content here..."
-              className="w-full p-4 border border-gray-200 rounded-lg focus:border-[#46c7c7] focus:ring-2 focus:ring-[#46c7c7]/20 transition-all h-48 md:h-64 font-mono text-sm"
-            />
-            <div className="mt-4 flex flex-col md:flex-row items-center justify-between">
-              <span className="text-sm text-gray-500 mb-2 md:mb-0">
-                {emailContent.length} characters • {emailContent.split(/\s+/).length} words
-              </span>
-              <div className="flex gap-3 flex-col md:flex-row">
-                <button
-                  onClick={() => setShowPreview(true)}
-                  className="flex items-center px-4 py-2 bg-gray-50 text-gray-700 rounded-lg hover:bg-gray-100 transition-all"
-                >
-                  <FiEye className="w-5 h-5 mr-2" />
-                  Preview
-                </button>
-                <button
-                  onClick={handleSendEmail}
-                  disabled={isSending || subscribers.length === 0}
-                  className="flex items-center px-6 py-2.5 bg-gradient-to-br from-[#46c7c7] to-[#3aa8a8] text-white rounded-lg hover:opacity-90 disabled:opacity-50 disabled:hover:opacity-50 transition-all"
-                >
-                  {isSending ? (
-                    <>
-                      <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      Sending...
-                    </>
-                  ) : (
-                    <>
-                      <FiSend className="w-5 h-5 mr-2" />
-                      {selectedEmails.length > 0 ? "Send to Selected" : "Broadcast to All Subscribers"}
-                    </>
-                  )}
-                </button>
-              </div>
-            </div>
-          </div>
+  <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+    <FiSend className="w-5 h-5 text-[#46c7c7]" />
+    Compose Newsletter
+  </h2>
+
+  {/* Email Subject Input */}
+  <div className="mb-4">
+    <label className="block text-sm font-medium text-gray-700 mb-2" htmlFor="subject">
+      Subject
+    </label>
+    <input
+      type="text"
+      id="subject"
+      value={emailSubject}
+      onChange={(e) => setEmailSubject(e.target.value)}
+      placeholder="Enter the subject of your email"
+      className="w-full p-4 border border-gray-200 rounded-lg focus:border-[#46c7c7] focus:ring-2 focus:ring-[#46c7c7]/20 transition-all"
+    />
+  </div>
+
+  {/* Email Content */}
+  <textarea
+    value={emailContent}
+    onChange={(e) => setEmailContent(e.target.value)}
+    placeholder="Write your HTML email content here..."
+    className="w-full p-4 border border-gray-200 rounded-lg focus:border-[#46c7c7] focus:ring-2 focus:ring-[#46c7c7]/20 transition-all h-48 md:h-64 font-mono text-sm"
+  />
+
+  <div className="mt-4 flex flex-col md:flex-row items-center justify-between">
+    <span className="text-sm text-gray-500 mb-2 md:mb-0">
+      {emailContent.length} characters • {emailContent.split(/\s+/).length} words
+    </span>
+    <div className="flex gap-3 flex-col md:flex-row">
+      <button
+        onClick={() => setShowPreview(true)}
+        className="flex items-center px-4 py-2 bg-gray-50 text-gray-700 rounded-lg hover:bg-gray-100 transition-all"
+      >
+        <FiEye className="w-5 h-5 mr-2" />
+        Preview
+      </button>
+      <button
+        onClick={handleSendEmail}
+        disabled={isSending || subscribers.length === 0}
+        className="flex items-center px-6 py-2.5 bg-gradient-to-br from-[#46c7c7] to-[#3aa8a8] text-white rounded-lg hover:opacity-90 disabled:opacity-50 disabled:hover:opacity-50 transition-all"
+      >
+        {isSending ? (
+          <>
+            <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            Sending...
+          </>
+        ) : (
+          <>
+            <FiSend className="w-5 h-5 mr-2" />
+            {selectedEmails.length > 0 ? "Send to Selected" : "Broadcast to All Subscribers"}
+          </>
+        )}
+      </button>
+    </div>
+  </div>
+</div>
+
 
           {/* Subscribers Table Section */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
