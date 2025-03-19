@@ -29,18 +29,36 @@ const useNewsletterStore = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  // Fetch subscribers in real-time
+  // Fetch subscribers in real-time and auto-delete duplicates
   useEffect(() => {
     const q = query(collection(db, "newsletter_signups"), orderBy("timestamp", "desc"));
 
     const unsubscribe = onSnapshot(
       q,
       (snapshot) => {
-        const subs = snapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-          timestamp: doc.data().timestamp?.toDate().toLocaleDateString(),
-        }));
+        const seenEmails = new Set();
+        const subs = [];
+
+        snapshot.docs.forEach((docSnapshot) => {
+          const data = docSnapshot.data();
+          // Normalize email for comparison (if available)
+          const email = data.email ? data.email.toLowerCase() : null;
+          if (email && seenEmails.has(email)) {
+            // Duplicate found, delete it automatically
+            deleteDoc(doc(db, "newsletter_signups", docSnapshot.id))
+              .catch((err) =>
+                console.error("Error deleting duplicate subscriber:", err)
+              );
+          } else {
+            if (email) seenEmails.add(email);
+            subs.push({
+              id: docSnapshot.id,
+              ...data,
+              timestamp: data.timestamp?.toDate().toLocaleDateString(),
+            });
+          }
+        });
+
         setSubscribers(subs);
         setLoading(false);
       },
@@ -83,6 +101,7 @@ const useNewsletterStore = () => {
     bulkDeleteSubscribers,
   };
 };
+
 
 export default function Newsletter() {
   const {
