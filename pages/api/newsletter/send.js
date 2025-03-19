@@ -48,7 +48,7 @@ export default async function handler(req, res) {
       i++;
 
       // Add a 1-second delay between emails
-      await delay(1000); // Adjust the delay time as needed
+      await delay(50); // Adjust the delay time as needed
     }
 
     res.status(200).json({
