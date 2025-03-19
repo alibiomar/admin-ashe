@@ -85,5 +85,5 @@ export default async function handler(req, res) {
 // This function can be used to trigger background processing
 const triggerBackgroundProcessing = async (jobId) => {
   // Example: an external trigger like HTTP request or cron job
-  await fetch(`/api/processEmails?jobId=${jobId}`);
+  await fetch(`/api/newsletter/processEmails?jobId=${jobId}`);
 };
