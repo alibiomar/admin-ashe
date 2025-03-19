@@ -154,7 +154,7 @@ export default function Newsletter() {
   const totalPages = Math.ceil(filteredSubscribers.length / itemsPerPage);
 
   // Prepare batches of 5 subscribers each
-  const createBatches = (subscribers, batchSize = 5) => {
+  const createBatches = (subscribers, batchSize = 3) => {
     const batches = [];
     for (let i = 0; i < subscribers.length; i += batchSize) {
       batches.push(subscribers.slice(i, i + batchSize));
