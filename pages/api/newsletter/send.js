@@ -8,7 +8,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  const { emails, htmlContent } = req.body;
+  const { emails, htmlContent,subject } = req.body;
 
   if (!emails || !htmlContent) {
     return res.status(400).json({ error: "Missing required fields" });
@@ -37,7 +37,7 @@ export default async function handler(req, res) {
         await transporter.sendMail({
           from: `ASHE™ <${process.env.SMTP_SERVER_USERNAME}>`, // Sender address
           to: email, // Send to one recipient at a time
-          subject: "Check out our latest newsletter!", // Email subject
+          subject: subject, // Email subject
           html: htmlContent, // HTML email content
         });
         successfulEmails++;
