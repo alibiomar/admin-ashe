@@ -177,7 +177,8 @@ export default function Products() {
         name: product.name,
         index: product.index,
         description: product.description,
-        price: parseFloat(product.price),
+        price: Number(parseFloat(product.price).toFixed(2)),
+
         colors: processedColors,
         sizes: overallSizes,
         createdAt: new Date()
