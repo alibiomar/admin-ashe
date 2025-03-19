@@ -48,7 +48,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const batchSize = 2; // Process the first 5 emails
+    const batchSize = 4; // Process the first 5 emails
     const firstBatch = emails.slice(0, Math.min(batchSize, emails.length));
     const remainingEmails = emails.slice(Math.min(batchSize, emails.length));
 
