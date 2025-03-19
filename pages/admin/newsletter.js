@@ -20,8 +20,10 @@ import {
   FiDownload,
   FiEye,
   FiX,
+  FiCheckCircle,
+  FiChevronRight,
 } from "react-icons/fi";
-import { marked } from "marked"; 
+import { marked } from "marked";
 
 // Flux-inspired state management
 const useNewsletterStore = () => {
@@ -31,7 +33,10 @@ const useNewsletterStore = () => {
 
   // Fetch subscribers in real-time and auto-delete duplicates
   useEffect(() => {
-    const q = query(collection(db, "newsletter_signups"), orderBy("timestamp", "desc"));
+    const q = query(
+      collection(db, "newsletter_signups"),
+      orderBy("timestamp", "desc")
+    );
 
     const unsubscribe = onSnapshot(
       q,
@@ -45,10 +50,10 @@ const useNewsletterStore = () => {
           const email = data.email ? data.email.toLowerCase() : null;
           if (email && seenEmails.has(email)) {
             // Duplicate found, delete it automatically
-            deleteDoc(doc(db, "newsletter_signups", docSnapshot.id))
-              .catch((err) =>
+            deleteDoc(doc(db, "newsletter_signups", docSnapshot.id)).catch(
+              (err) =>
                 console.error("Error deleting duplicate subscriber:", err)
-              );
+            );
           } else {
             if (email) seenEmails.add(email);
             subs.push({
@@ -85,7 +90,9 @@ const useNewsletterStore = () => {
   // Bulk delete subscribers
   const bulkDeleteSubscribers = async (ids) => {
     try {
-      await Promise.all(ids.map((id) => deleteDoc(doc(db, "newsletter_signups", id))));
+      await Promise.all(
+        ids.map((id) => deleteDoc(doc(db, "newsletter_signups", id)))
+      );
       return true;
     } catch (err) {
       setError("Failed to delete subscribers");
@@ -101,7 +108,6 @@ const useNewsletterStore = () => {
     bulkDeleteSubscribers,
   };
 };
-
 
 export default function Newsletter() {
   const {
@@ -121,6 +127,9 @@ export default function Newsletter() {
   const [itemsPerPage] = useState(10); // Items per page
   const [showPreview, setShowPreview] = useState(false); // Email preview modal
   const [emailSubject, setEmailSubject] = useState(""); // Subject state
+  const [sentBatches, setSentBatches] = useState([]); // Track sent batches
+  const [batchMode, setBatchMode] = useState(false); // Toggle between manual batch mode and all subscribers
+  const [currentBatchIndex, setCurrentBatchIndex] = useState(0); // Current batch index for batch mode
 
   // Deletion confirmation modal state
   const [deleteConfirm, setDeleteConfirm] = useState({
@@ -138,8 +147,25 @@ export default function Newsletter() {
   // Pagination logic
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentSubscribers = filteredSubscribers.slice(indexOfFirstItem, indexOfLastItem);
+  const currentSubscribers = filteredSubscribers.slice(
+    indexOfFirstItem,
+    indexOfLastItem
+  );
   const totalPages = Math.ceil(filteredSubscribers.length / itemsPerPage);
+
+  // Prepare batches of 5 subscribers each
+  const createBatches = (subscribers, batchSize = 5) => {
+    const batches = [];
+    for (let i = 0; i < subscribers.length; i += batchSize) {
+      batches.push(subscribers.slice(i, i + batchSize));
+    }
+    return batches;
+  };
+
+  // Calculate batches
+  const allBatches = createBatches(filteredSubscribers);
+  const totalBatches = allBatches.length;
+  const currentBatch = allBatches[currentBatchIndex] || [];
 
   // Show confirmation modal before bulk deletion
   const handleBulkDeleteConfirm = () => {
@@ -158,46 +184,150 @@ export default function Newsletter() {
     if (deleteConfirm.type === "single") {
       const success = await deleteSubscriber(deleteConfirm.id);
       if (success) {
-        setNotification({ message: "Subscriber deleted successfully", type: "success" });
+        setNotification({
+          message: "Subscriber deleted successfully",
+          type: "success",
+        });
       } else {
-        setNotification({ message: "Failed to delete subscriber", type: "error" });
+        setNotification({
+          message: "Failed to delete subscriber",
+          type: "error",
+        });
       }
     } else if (deleteConfirm.type === "bulk") {
       const success = await bulkDeleteSubscribers(deleteConfirm.ids);
       if (success) {
-        setNotification({ message: `Deleted ${deleteConfirm.ids.length} subscriber(s) successfully`, type: "success" });
+        setNotification({
+          message: `Deleted ${deleteConfirm.ids.length} subscriber(s) successfully`,
+          type: "success",
+        });
         setSelectedEmails([]);
       } else {
-        setNotification({ message: "Failed to delete subscribers", type: "error" });
+        setNotification({
+          message: "Failed to delete subscribers",
+          type: "error",
+        });
       }
     }
     setDeleteConfirm({ show: false, type: "", id: null, ids: [] });
   };
 
-  // Handle sending email (to selected if any, else broadcast to all)
-  const handleSendEmail = async () => {
+  // Navigate between batches
+  const goToNextBatch = () => {
+    if (currentBatchIndex < totalBatches - 1) {
+      setCurrentBatchIndex(currentBatchIndex + 1);
+    }
+  };
+
+  const goToPreviousBatch = () => {
+    if (currentBatchIndex > 0) {
+      setCurrentBatchIndex(currentBatchIndex - 1);
+    }
+  };
+
+  // Handle sending current batch of emails
+  const handleSendBatch = async () => {
     if (!emailSubject.trim() || !emailContent.trim()) {
-      setNotification({ message: "Please enter both subject and content", type: "error" });
+      setNotification({
+        message: "Please enter both subject and content",
+        type: "error",
+      });
       return;
     }
-  
+
+    if (currentBatch.length === 0) {
+      setNotification({
+        message: "No subscribers in current batch",
+        type: "error",
+      });
+      return;
+    }
+
     setIsSending(true);
-  
+
     try {
-      const targetSubscribers = selectedEmails.length > 0 
-        ? subscribers.filter((sub) => selectedEmails.includes(sub.id)) 
-        : subscribers;
-  
+      const response = await fetch("/api/newsletter/send", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          subject: emailSubject,
+          emails: currentBatch.map((sub) => sub.email),
+          htmlContent: emailContent,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setNotification({
+          message: data.error || "Failed to send batch",
+          type: "error",
+        });
+      } else {
+        // Add batch to sent batches
+        setSentBatches([
+          ...sentBatches,
+          {
+            index: currentBatchIndex,
+            subscribers: currentBatch,
+            timestamp: new Date().toLocaleTimeString(),
+          },
+        ]);
+
+        setNotification({
+          message: `Batch ${currentBatchIndex + 1} (${currentBatch.length} recipients) sent successfully`,
+          type: "success",
+        });
+
+        // Automatically go to next batch if available
+        if (currentBatchIndex < totalBatches - 1) {
+          setTimeout(() => {
+            goToNextBatch();
+          }, 1000);
+        }
+      }
+    } catch (err) {
+      setNotification({ message: "Failed to send emails", type: "error" });
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  // Handle sending to selected emails or broadcast to all
+  const handleSendEmail = async () => {
+    if (!emailSubject.trim() || !emailContent.trim()) {
+      setNotification({
+        message: "Please enter both subject and content",
+        type: "error",
+      });
+      return;
+    }
+
+    setIsSending(true);
+
+    try {
+      const targetSubscribers =
+        selectedEmails.length > 0
+          ? subscribers.filter((sub) => selectedEmails.includes(sub.id))
+          : subscribers;
+
       if (targetSubscribers.length === 0) {
-        setNotification({ message: "No subscribers selected", type: "error" });
+        setNotification({
+          message: "No subscribers selected",
+          type: "error",
+        });
         setIsSending(false);
         return;
       }
-  
-      // **Batch Sending (5 at a time)**
-      for (let i = 0; i < targetSubscribers.length; i += 5) {
-        const batch = targetSubscribers.slice(i, i + 5);
-  
+
+      // Batch Sending (5 at a time)
+      const batches = createBatches(targetSubscribers);
+
+      for (let i = 0; i < batches.length; i++) {
+        const batch = batches[i];
+
         const response = await fetch("/api/newsletter/send", {
           method: "POST",
           headers: {
@@ -209,25 +339,48 @@ export default function Newsletter() {
             htmlContent: emailContent,
           }),
         });
-  
+
         const data = await response.json();
-        
+
         if (!response.ok) {
-          setNotification({ message: data.error || `Failed to send batch ${i / 5 + 1}`, type: "error" });
+          setNotification({
+            message: data.error || `Failed to send batch ${i + 1}`,
+            type: "error",
+          });
+          break;
         } else {
-          setNotification({ message: `Batch ${i / 5 + 1} sent successfully`, type: "success" });
+          // Add to sent batches
+          setSentBatches([
+            ...sentBatches,
+            {
+              index: i,
+              subscribers: batch,
+              timestamp: new Date().toLocaleTimeString(),
+            },
+          ]);
+
+          setNotification({
+            message: `Batch ${i + 1} sent successfully`,
+            type: "success",
+          });
         }
-  
-        // **Optional: Delay Between Batches to Avoid Spam Filters**
-        await new Promise((resolve) => setTimeout(resolve, 2000));
+
+        // Delay Between Batches to Avoid Spam Filters
+        if (i < batches.length - 1) {
+          await new Promise((resolve) => setTimeout(resolve, 2000));
+        }
       }
+
+      setNotification({
+        message: `All ${batches.length} batches sent successfully (${targetSubscribers.length} recipients)`,
+        type: "success",
+      });
     } catch (err) {
       setNotification({ message: "Failed to send emails", type: "error" });
     } finally {
       setIsSending(false);
     }
   };
-  
 
   // Clear notification after a delay
   useEffect(() => {
@@ -249,6 +402,17 @@ export default function Newsletter() {
   // Select all emails on current page
   const selectAllEmails = () => {
     setSelectedEmails(currentSubscribers.map((sub) => sub.id));
+  };
+
+  // Select all emails in current batch
+  const selectAllInBatch = () => {
+    setSelectedEmails(currentBatch.map((sub) => sub.id));
+  };
+
+  // Reset sent batches
+  const resetSentBatches = () => {
+    setSentBatches([]);
+    setCurrentBatchIndex(0);
   };
 
   // Memoize the renderSubscriber function to prevent unnecessary re-renders
@@ -309,7 +473,9 @@ export default function Newsletter() {
                 )}
                 <span
                   className={`text-sm ${
-                    notification.type === "success" ? "text-emerald-700" : "text-rose-700"
+                    notification.type === "success"
+                      ? "text-emerald-700"
+                      : "text-rose-700"
                   }`}
                 >
                   {notification.message}
@@ -321,9 +487,12 @@ export default function Newsletter() {
           {/* Header */}
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">Newsletter Management</h1>
+              <h1 className="text-2xl font-bold text-gray-900">
+                Newsletter Management
+              </h1>
               <p className="text-gray-500 mt-1">
-                {subscribers.length} total subscribers • {filteredSubscribers.length} filtered
+                {subscribers.length} total subscribers •{" "}
+                {filteredSubscribers.length} filtered • {totalBatches} batches
               </p>
             </div>
             <div className="flex gap-3 w-full md:w-auto">
@@ -342,75 +511,227 @@ export default function Newsletter() {
 
           {/* Email Composition Card */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-8">
-  <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-    <FiSend className="w-5 h-5 text-[#46c7c7]" />
-    Compose Newsletter
-  </h2>
+            <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+              <FiSend className="w-5 h-5 text-[#46c7c7]" />
+              Compose Newsletter
+            </h2>
 
-  {/* Email Subject Input */}
-  <div className="mb-4">
-    <label className="block text-sm font-medium text-gray-700 mb-2" htmlFor="subject">
-      Subject
-    </label>
-    <input
-      type="text"
-      id="subject"
-      value={emailSubject}
-      onChange={(e) => setEmailSubject(e.target.value)}
-      placeholder="Enter the subject of your email"
-      className="w-full p-4 border border-gray-200 rounded-lg focus:border-[#46c7c7] focus:ring-2 focus:ring-[#46c7c7]/20 transition-all"
-    />
-  </div>
+            {/* Email Subject Input */}
+            <div className="mb-4">
+              <label
+                className="block text-sm font-medium text-gray-700 mb-2"
+                htmlFor="subject"
+              >
+                Subject
+              </label>
+              <input
+                type="text"
+                id="subject"
+                value={emailSubject}
+                onChange={(e) => setEmailSubject(e.target.value)}
+                placeholder="Enter the subject of your email"
+                className="w-full p-4 border border-gray-200 rounded-lg focus:border-[#46c7c7] focus:ring-2 focus:ring-[#46c7c7]/20 transition-all"
+              />
+            </div>
 
-  {/* Email Content */}
-  <textarea
-    value={emailContent}
-    onChange={(e) => setEmailContent(e.target.value)}
-    placeholder="Write your HTML email content here..."
-    className="w-full p-4 border border-gray-200 rounded-lg focus:border-[#46c7c7] focus:ring-2 focus:ring-[#46c7c7]/20 transition-all h-48 md:h-64 font-mono text-sm"
-  />
+            {/* Email Content */}
+            <textarea
+              value={emailContent}
+              onChange={(e) => setEmailContent(e.target.value)}
+              placeholder="Write your HTML email content here..."
+              className="w-full p-4 border border-gray-200 rounded-lg focus:border-[#46c7c7] focus:ring-2 focus:ring-[#46c7c7]/20 transition-all h-48 md:h-64 font-mono text-sm"
+            />
 
-  <div className="mt-4 flex flex-col md:flex-row items-center justify-between">
-    <span className="text-sm text-gray-500 mb-2 md:mb-0">
-      {emailContent.length} characters • {emailContent.split(/\s+/).length} words
-    </span>
-    <div className="flex gap-3 flex-col md:flex-row">
-      <button
-        onClick={() => setShowPreview(true)}
-        className="flex items-center px-4 py-2 bg-gray-50 text-gray-700 rounded-lg hover:bg-gray-100 transition-all"
-      >
-        <FiEye className="w-5 h-5 mr-2" />
-        Preview
-      </button>
-      <button
-        onClick={handleSendEmail}
-        disabled={isSending || subscribers.length === 0}
-        className="flex items-center px-6 py-2.5 bg-gradient-to-br from-[#46c7c7] to-[#3aa8a8] text-white rounded-lg hover:opacity-90 disabled:opacity-50 disabled:hover:opacity-50 transition-all"
-      >
-        {isSending ? (
-          <>
-            <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
-            Sending...
-          </>
-        ) : (
-          <>
-            <FiSend className="w-5 h-5 mr-2" />
-            {selectedEmails.length > 0 ? "Send to Selected" : "Broadcast to All Subscribers"}
-          </>
-        )}
-      </button>
-    </div>
-  </div>
-</div>
+            <div className="mt-4 flex flex-col md:flex-row items-center justify-between">
+              <span className="text-sm text-gray-500 mb-2 md:mb-0">
+                {emailContent.length} characters •{" "}
+                {emailContent.split(/\s+/).length} words
+              </span>
 
+              {/* Preview Button and Action Buttons */}
+              <div className="flex gap-3 flex-col md:flex-row">
+                <button
+                  onClick={() => setShowPreview(true)}
+                  className="flex items-center px-4 py-2 bg-gray-50 text-gray-700 rounded-lg hover:bg-gray-100 transition-all"
+                >
+                  <FiEye className="w-5 h-5 mr-2" />
+                  Preview
+                </button>
+
+                {/* Toggle Batch Mode */}
+                <button
+                  onClick={() => setBatchMode(!batchMode)}
+                  className={`flex items-center px-4 py-2 rounded-lg transition-all ${
+                    batchMode
+                      ? "bg-[#46c7c7] text-white"
+                      : "bg-gray-50 text-gray-700 hover:bg-gray-100"
+                  }`}
+                >
+                  {batchMode ? "Exit Batch Mode" : "Enter Batch Mode"}
+                </button>
+
+                {/* Send Button */}
+                {batchMode ? (
+                  <button
+                    onClick={handleSendBatch}
+                    disabled={isSending || currentBatch.length === 0}
+                    className="flex items-center px-6 py-2.5 bg-gradient-to-br from-[#46c7c7] to-[#3aa8a8] text-white rounded-lg hover:opacity-90 disabled:opacity-50 disabled:hover:opacity-50 transition-all"
+                  >
+                    {isSending ? (
+                      <>
+                        <svg
+                          className="animate-spin -ml-1 mr-3 h-5 w-5 text-white"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                        >
+                          <circle
+                            className="opacity-25"
+                            cx="12"
+                            cy="12"
+                            r="10"
+                            stroke="currentColor"
+                            strokeWidth="4"
+                          ></circle>
+                          <path
+                            className="opacity-75"
+                            fill="currentColor"
+                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                          ></path>
+                        </svg>
+                        Sending...
+                      </>
+                    ) : (
+                      <>
+                        <FiSend className="w-5 h-5 mr-2" />
+                        Send Batch {currentBatchIndex + 1} (
+                        {currentBatch.length} recipients)
+                      </>
+                    )}
+                  </button>
+                ) : (
+                  <button
+                    onClick={handleSendEmail}
+                    disabled={isSending || subscribers.length === 0}
+                    className="flex items-center px-6 py-2.5 bg-gradient-to-br from-[#46c7c7] to-[#3aa8a8] text-white rounded-lg hover:opacity-90 disabled:opacity-50 disabled:hover:opacity-50 transition-all"
+                  >
+                    {isSending ? (
+                      <>
+                        <svg
+                          className="animate-spin -ml-1 mr-3 h-5 w-5 text-white"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                        >
+                          <circle
+                            className="opacity-25"
+                            cx="12"
+                            cy="12"
+                            r="10"
+                            stroke="currentColor"
+                            strokeWidth="4"
+                          ></circle>
+                          <path
+                            className="opacity-75"
+                            fill="currentColor"
+                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                          ></path>
+                        </svg>
+                        Sending...
+                      </>
+                    ) : (
+                      <>
+                        <FiSend className="w-5 h-5 mr-2" />
+                        {selectedEmails.length > 0
+                          ? "Send to Selected"
+                          : "Broadcast to All Subscribers"}
+                      </>
+                    )}
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Batch Navigation (Only visible in batch mode) */}
+          {batchMode && (
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-8">
+              <div className="flex flex-col md:flex-row items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-800 mb-2">
+                    Batch Navigation
+                  </h3>
+                  <p className="text-gray-500">
+                    Batch {currentBatchIndex + 1} of {totalBatches} •{" "}
+                    {currentBatch.length} subscribers in current batch
+                  </p>
+                </div>
+
+                <div className="flex gap-2 mt-4 md:mt-0">
+                  <button
+                    onClick={goToPreviousBatch}
+                    disabled={currentBatchIndex === 0}
+                    className="flex items-center px-4 py-2 bg-gray-50 text-gray-700 rounded-lg hover:bg-gray-100 disabled:opacity-50"
+                  >
+                    Previous Batch
+                  </button>
+                  <button
+                    onClick={goToNextBatch}
+                    disabled={currentBatchIndex === totalBatches - 1}
+                    className="flex items-center px-4 py-2 bg-gray-50 text-gray-700 rounded-lg hover:bg-gray-100 disabled:opacity-50"
+                  >
+                    Next Batch
+                  </button>
+                  <button
+                    onClick={selectAllInBatch}
+                    className="flex items-center px-4 py-2 bg-gray-50 text-gray-700 rounded-lg hover:bg-gray-100"
+                  >
+                    Select All in Batch
+                  </button>
+                </div>
+              </div>
+
+              {/* Sent Batches Status */}
+              {sentBatches.length > 0 && (
+                <div className="mt-6 border-t pt-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="font-medium text-gray-700">Sent Batches</h4>
+                    <button
+                      onClick={resetSentBatches}
+                      className="text-sm text-gray-500 hover:text-gray-700"
+                    >
+                      Reset
+                    </button>
+                  </div>
+                  <div className="grid gap-2 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
+                    {sentBatches.map((batch, idx) => (
+                      <div
+                        key={idx}
+                        className="flex items-center p-3 bg-emerald-50 rounded-lg border border-emerald-100"
+                      >
+                        <FiCheckCircle className="w-5 h-5 text-emerald-500 mr-3" />
+                        <div>
+                          <p className="font-medium text-emerald-700">
+                            Batch {batch.index + 1} ({batch.subscribers.length} recipients)
+                          </p>
+                          <p className="text-xs text-emerald-600">
+                            Sent at {batch.timestamp}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Subscribers Table Section */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
             <div className="flex items-center justify-between p-6 border-b border-gray-100">
-              <h3 className="text-lg font-semibold text-gray-800">Subscriber List</h3>
+              <h3 className="text-lg font-semibold text-gray-800">
+                {batchMode
+                  ? `Current Batch (${currentBatch.length} subscribers)`
+                  : "Subscriber List"}
+              </h3>
               {selectedEmails.length > 0 && (
                 <button
                   onClick={handleBulkDeleteConfirm}
@@ -437,12 +758,26 @@ export default function Newsletter() {
                   {error}
                 </div>
               </div>
+            ) : batchMode && currentBatch.length === 0 ? (
+              <div className="p-12 text-center">
+                <div className="inline-flex flex-col items-center">
+                  <FiMail className="w-12 h-12 text-gray-400 mb-4" />
+                  <p className="text-gray-500">No subscribers in current batch</p>
+                  <p className="text-sm text-gray-400 mt-2">
+                    Try navigating to another batch
+                  </p>
+                </div>
+              </div>
             ) : filteredSubscribers.length === 0 ? (
               <div className="p-12 text-center">
                 <div className="inline-flex flex-col items-center">
                   <FiMail className="w-12 h-12 text-gray-400 mb-4" />
-                  <p className="text-gray-500">No subscribers found matching your criteria</p>
-                  <p className="text-sm text-gray-400 mt-2">Try adjusting your search filters</p>
+                  <p className="text-gray-500">
+                    No subscribers found matching your criteria
+                  </p>
+                  <p className="text-sm text-gray-400 mt-2">
+                    Try adjusting your search filters
+                  </p>
                 </div>
               </div>
             ) : (
@@ -454,44 +789,68 @@ export default function Newsletter() {
                         <th className="px-6 py-3 text-left text-sm font-medium text-gray-500">
                           <input
                             type="checkbox"
-                            checked={selectedEmails.length === currentSubscribers.length}
-                            onChange={selectAllEmails}
+                            checked={
+                              batchMode
+                                ? selectedEmails.length === currentBatch.length &&
+                                  currentBatch.length > 0
+                                : selectedEmails.length === currentSubscribers.length &&
+                                  currentSubscribers.length > 0
+                            }
+                            onChange={
+                              batchMode ? selectAllInBatch : selectAllEmails
+                            }
                             className="form-checkbox h-4 w-4 rounded border-gray-300 text-[#46c7c7] focus:ring-[#46c7c7]"
                           />
                         </th>
-                        <th className="px-6 py-3 text-left text-sm font-medium text-gray-500">Subscriber</th>
-                        <th className="px-6 py-3 text-left text-sm font-medium text-gray-500">Signup Date</th>
-                        <th className="px-6 py-3 text-left text-sm font-medium text-gray-500">Actions</th>
+                        <th className="px-6 py-3 text-left text-sm font-medium text-gray-500">
+                          Subscriber
+                        </th>
+                        <th className="px-6 py-3 text-left text-sm font-medium text-gray-500">
+                          Signup Date
+                        </th>
+                        <th className="px-6 py-3 text-left text-sm font-medium text-gray-500">
+                          Actions
+                        </th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
-                      {currentSubscribers.map(renderSubscriber)}
+                      {batchMode
+                        ? currentBatch.map(renderSubscriber)
+                        : currentSubscribers.map(renderSubscriber)}
                     </tbody>
                   </table>
                 </div>
 
-                {/* Pagination */}
-                <div className="flex flex-col sm:flex-row items-center justify-between p-4 border-t border-gray-100">
-                  <span className="text-sm text-gray-500 mb-2 sm:mb-0">
-                    Showing {indexOfFirstItem + 1} to {Math.min(indexOfLastItem, filteredSubscribers.length)} of {filteredSubscribers.length} entries
-                  </span>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
-                      disabled={currentPage === 1}
-                      className="px-4 py-2 bg-gray-50 text-gray-700 rounded-lg hover:bg-gray-100 disabled:opacity-50"
-                    >
-                      Previous
-                    </button>
-                    <button
-                      onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
-                      disabled={currentPage === totalPages}
-                      className="px-4 py-2 bg-gray-50 text-gray-700 rounded-lg hover:bg-gray-100 disabled:opacity-50"
-                    >
-                      Next
-                    </button>
+                {/* Pagination (only in normal mode) */}
+                {!batchMode && (
+                  <div className="flex flex-col sm:flex-row items-center justify-between p-4 border-t border-gray-100">
+                    <span className="text-sm text-gray-500 mb-2 sm:mb-0">
+                      Page {currentPage} of {totalPages}
+                    </span>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() =>
+                          setCurrentPage((prev) => Math.max(prev - 1, 1))
+                        }
+                        disabled={currentPage === 1}
+                        className="px-4 py-2 bg-gray-50 text-gray-700 rounded-lg hover:bg-gray-100 disabled:opacity-50"
+                      >
+                        Previous
+                      </button>
+                      <button
+                        onClick={() =>
+                          setCurrentPage((prev) =>
+                            Math.min(prev + 1, totalPages)
+                          )
+                        }
+                        disabled={currentPage === totalPages}
+                        className="px-4 py-2 bg-gray-50 text-gray-700 rounded-lg hover:bg-gray-100 disabled:opacity-50"
+                      >
+                        Next
+                      </button>
+                    </div>
                   </div>
-                </div>
+                )}
               </>
             )}
           </div>
@@ -529,7 +888,9 @@ export default function Newsletter() {
                 </p>
                 <div className="flex justify-end gap-3">
                   <button
-                    onClick={() => setDeleteConfirm({ show: false, type: "", id: null, ids: [] })}
+                    onClick={() =>
+                      setDeleteConfirm({ show: false, type: "", id: null, ids: [] })
+                    }
                     className="px-4 py-2 bg-gray-50 text-gray-700 rounded-lg hover:bg-gray-100"
                   >
                     Cancel
