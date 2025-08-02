@@ -31,13 +31,7 @@ export default function Products() {
     setProduct((prev) => ({ ...prev, [name]: value }));
   };
 
-  const convertGoogleDriveLink = (url) => {
-    const match = url.match(/\/d\/(.*)\/view\?/);
-    if (match && match[1]) {
-      return `https://drive.google.com/uc?export=view&id=${match[1]}`;
-    }
-    return url;
-  };
+
 
   // -------------------- Colors Handling --------------------
 
@@ -56,7 +50,7 @@ export default function Products() {
       const updatedColors = [...prev.colors];
       const color = updatedColors[colorIndex];
       const updatedImages = [...color.images];
-      updatedImages[imageIndex] = convertGoogleDriveLink(value);
+      updatedImages[imageIndex] = value;
       updatedColors[colorIndex] = { ...color, images: updatedImages };
       return { ...prev, colors: updatedColors };
     });
