@@ -456,3 +456,4 @@ const getStatusColor = (status) => {
   };
   return colors[status.toLowerCase()] || 'bg-gray-400';
 };
+const formatPercentage = (value) => `${value > 0 ? '+' : ''}${value}%`;
