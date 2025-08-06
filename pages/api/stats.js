@@ -44,36 +44,50 @@ export default async function handler(req, res) {
     const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
 
     // Enhanced Order Statistics with trends and insights
+    const SHIPPING_FEE = 8; // 8 TND shipping fee
+    
     const orderStats = ordersSnapshot.docs.reduce((acc, doc) => {
       const order = doc.data();
-      const amount = parseFloat(order.totalAmount) || 0;
+      const totalAmount = parseFloat(order.totalAmount) || 0;
       const orderDate = order.createdAt?.toDate ? order.createdAt.toDate() : new Date(order.createdAt);
+      
+      // Separate product revenue from shipping fees
+      const productRevenue = Math.max(0, totalAmount - SHIPPING_FEE);
+      const shippingRevenue = totalAmount > 0 ? SHIPPING_FEE : 0;
 
       // Status breakdown
       acc.statusCounts[order.status] = (acc.statusCounts[order.status] || 0) + 1;
 
-      // Revenue calculations
-      acc.totalRevenue += amount;
+      // Revenue calculations (product revenue only)
+      acc.totalProductRevenue += productRevenue;
+      acc.totalShippingRevenue += shippingRevenue;
+      acc.totalRevenue += totalAmount; // Keep total for reference
 
       // Monthly comparisons
       if (orderDate >= startOfCurrentMonth) {
-        acc.currentMonthRevenue += amount;
+        acc.currentMonthProductRevenue += productRevenue;
+        acc.currentMonthShippingRevenue += shippingRevenue;
+        acc.currentMonthRevenue += totalAmount;
         acc.currentMonthOrders++;
       }
 
       if (orderDate >= startOfLastMonth && orderDate <= endOfLastMonth) {
-        acc.lastMonthRevenue += amount;
+        acc.lastMonthProductRevenue += productRevenue;
+        acc.lastMonthShippingRevenue += shippingRevenue;
+        acc.lastMonthRevenue += totalAmount;
         acc.lastMonthOrders++;
       }
 
       // Weekly tracking
       if (orderDate >= oneWeekAgo) {
-        acc.weeklyRevenue += amount;
+        acc.weeklyProductRevenue += productRevenue;
+        acc.weeklyShippingRevenue += shippingRevenue;
+        acc.weeklyRevenue += totalAmount;
         acc.weeklyOrders++;
       }
 
-      // Average order value calculation
-      acc.totalOrderValue += amount;
+      // Average order value calculation (total amount)
+      acc.totalOrderValue += totalAmount;
 
       // Popular payment methods
       if (order.paymentMethod) {
@@ -83,9 +97,17 @@ export default async function handler(req, res) {
       return acc;
     }, {
       totalRevenue: 0,
+      totalProductRevenue: 0,
+      totalShippingRevenue: 0,
       currentMonthRevenue: 0,
+      currentMonthProductRevenue: 0,
+      currentMonthShippingRevenue: 0,
       lastMonthRevenue: 0,
+      lastMonthProductRevenue: 0,
+      lastMonthShippingRevenue: 0,
       weeklyRevenue: 0,
+      weeklyProductRevenue: 0,
+      weeklyShippingRevenue: 0,
       statusCounts: {},
       currentMonthOrders: 0,
       lastMonthOrders: 0,
@@ -94,8 +116,12 @@ export default async function handler(req, res) {
       paymentMethods: {}
     });
 
-    // Calculate revenue growth
-    const revenueGrowth = orderStats.lastMonthRevenue > 0 
+    // Calculate revenue growth (using product revenue for business metrics)
+    const productRevenueGrowth = orderStats.lastMonthProductRevenue > 0 
+      ? ((orderStats.currentMonthProductRevenue - orderStats.lastMonthProductRevenue) / orderStats.lastMonthProductRevenue * 100).toFixed(1)
+      : orderStats.currentMonthProductRevenue > 0 ? 100 : 0;
+
+    const totalRevenueGrowth = orderStats.lastMonthRevenue > 0
       ? ((orderStats.currentMonthRevenue - orderStats.lastMonthRevenue) / orderStats.lastMonthRevenue * 100).toFixed(1)
       : orderStats.currentMonthRevenue > 0 ? 100 : 0;
 
@@ -127,7 +153,7 @@ export default async function handler(req, res) {
 
           if (quantity === 0) {
             outOfStockSizes[size] = quantity;
-          } else if (quantity <= 2 && quantity > 0) { // Low stock threshold
+          } else if (quantity <= 5 && quantity > 0) { // Low stock threshold
             lowStockSizes[size] = quantity;
             lowStockItems++;
           }
@@ -256,17 +282,27 @@ export default async function handler(req, res) {
 
     // Compile comprehensive stats
     const stats = {
-      // Enhanced order metrics
+      // Enhanced order metrics with separated revenues
       totalOrders: ordersSnapshot.size,
-      totalRevenue: parseFloat(orderStats.totalRevenue.toFixed(2)),
+      totalRevenue: parseFloat(orderStats.totalRevenue.toFixed(2)), // Total including shipping
+      totalProductRevenue: parseFloat(orderStats.totalProductRevenue.toFixed(2)), // Product revenue only
+      totalShippingRevenue: parseFloat(orderStats.totalShippingRevenue.toFixed(2)), // Shipping revenue only
       currentMonthRevenue: parseFloat(orderStats.currentMonthRevenue.toFixed(2)),
+      currentMonthProductRevenue: parseFloat(orderStats.currentMonthProductRevenue.toFixed(2)),
+      currentMonthShippingRevenue: parseFloat(orderStats.currentMonthShippingRevenue.toFixed(2)),
       lastMonthRevenue: parseFloat(orderStats.lastMonthRevenue.toFixed(2)),
+      lastMonthProductRevenue: parseFloat(orderStats.lastMonthProductRevenue.toFixed(2)),
+      lastMonthShippingRevenue: parseFloat(orderStats.lastMonthShippingRevenue.toFixed(2)),
       weeklyRevenue: parseFloat(orderStats.weeklyRevenue.toFixed(2)),
-      revenueGrowth: parseFloat(revenueGrowth),
+      weeklyProductRevenue: parseFloat(orderStats.weeklyProductRevenue.toFixed(2)),
+      weeklyShippingRevenue: parseFloat(orderStats.weeklyShippingRevenue.toFixed(2)),
+      productRevenueGrowth: parseFloat(productRevenueGrowth),
+      totalRevenueGrowth: parseFloat(totalRevenueGrowth),
       ordersGrowth: parseFloat(ordersGrowth),
       averageOrderValue: parseFloat(averageOrderValue),
       orderStatusBreakdown: orderStats.statusCounts,
       paymentMethodBreakdown: orderStats.paymentMethods,
+      shippingFee: SHIPPING_FEE, // Include shipping fee for reference
 
       // Enhanced customer metrics
       totalCustomers: usersSnapshot.size,
@@ -290,14 +326,17 @@ export default async function handler(req, res) {
       newSubscribersLastMonth: newsletterStats.newSubscribersLastMonth,
       newSubscribersLastWeek: newsletterStats.newSubscribersLastWeek,
 
-      // Performance indicators
+      // Performance indicators with separated revenue metrics
       kpis: {
         totalRevenue: parseFloat(orderStats.totalRevenue.toFixed(2)),
+        totalProductRevenue: parseFloat(orderStats.totalProductRevenue.toFixed(2)),
+        totalShippingRevenue: parseFloat(orderStats.totalShippingRevenue.toFixed(2)),
         totalOrders: ordersSnapshot.size,
         totalCustomers: usersSnapshot.size,
         averageOrderValue: parseFloat(averageOrderValue),
         conversionRate: parseFloat(conversionRate),
-        revenueGrowth: parseFloat(revenueGrowth),
+        productRevenueGrowth: parseFloat(productRevenueGrowth),
+        totalRevenueGrowth: parseFloat(totalRevenueGrowth),
         customerGrowth: parseFloat(customerGrowth)
       },
 
@@ -311,8 +350,6 @@ export default async function handler(req, res) {
       }
     };
 
-    // Set appropriate cache headers for performance
-    res.setHeader('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=600');
     
     res.status(200).json(stats);
   } catch (error) {
