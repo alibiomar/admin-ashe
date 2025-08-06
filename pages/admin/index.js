@@ -13,7 +13,8 @@ import {
   Calendar,
   MapPin,
   CreditCard,
-  Boxes
+  Boxes,
+  Wallet
 } from 'lucide-react';
 
 // Import these components with correct paths
@@ -119,7 +120,7 @@ export default function Dashboard() {
                   color="green"
                 />
                 <KPICard
-                  title="Total Orders"
+                  title="Total Orders & Sales"
                   value={stats.totalOrders?.toLocaleString()}
                   change={stats.ordersGrowth}
                   icon={ShoppingCart}
@@ -133,21 +134,35 @@ export default function Dashboard() {
                   color="purple"
                 />
                 <KPICard
-                  title="Average Order"
-                  value={formatCurrency(stats.averageOrderValue)}
-                  icon={BarChart3}
+                  title="Net Profit"
+                  value={formatCurrency(stats.netProfit)}
+                  change={stats.netProfit >= 0 ? stats.productRevenueGrowth : -stats.expensesGrowth}
+                  icon={Wallet}
                   color="indigo"
+                />
+                <KPICard
+                  title="Total Expenses"
+                  value={formatCurrency(stats.totalExpenses)}
+                  change={stats.expensesGrowth}
+                  icon={DollarSign}
+                  color="red"
                 />
               </div>
 
-              {/* Revenue Breakdown */}
+              {/* Revenue & Expenses Breakdown */}
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <StatsCard title="Revenue Breakdown" icon={DollarSign}>
                   <div className="space-y-4">
                     <div className="flex justify-between items-center">
-                      <span className="text-gray-600">Product Revenue</span>
+                      <span className="text-gray-600">Online Product Revenue</span>
                       <span className="font-semibold text-green-600">
-                        {formatCurrency(stats.totalProductRevenue)}
+                        {formatCurrency(stats.totalOnlineProductRevenue || 0)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-600">Offline Product Revenue</span>
+                      <span className="font-semibold text-blue-600">
+                        {formatCurrency(stats.totalOfflineProductRevenue || 0)}
                       </span>
                     </div>
                     <div className="flex justify-between items-center">
@@ -182,6 +197,12 @@ export default function Dashboard() {
                       </span>
                     </div>
                     <div className="flex justify-between items-center">
+                      <span className="text-gray-600">This Month Expenses</span>
+                      <span className="font-semibold text-red-600">
+                        {formatCurrency(stats.currentMonthExpenses)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center">
                       <span className="text-gray-600">Weekly Total</span>
                       <span className="font-semibold text-purple-600">
                         {formatCurrency(stats.weeklyRevenue)}
@@ -198,31 +219,21 @@ export default function Dashboard() {
                   </div>
                 </StatsCard>
 
-                <StatsCard title="Customer Insights" icon={Users}>
+                <StatsCard title="Expenses by Category" icon={Wallet}>
                   <div className="space-y-4">
-                    <div className="flex justify-between items-center">
-                      <span className="text-gray-600">New This Month</span>
-                      <span className="font-semibold text-green-600">
-                        {stats.newCustomersThisMonth?.toLocaleString()}
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-gray-600">New This Week</span>
-                      <span className="font-semibold text-blue-600">
-                        {stats.newCustomersLastWeek?.toLocaleString()}
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-gray-600">Newsletter Subscribers</span>
-                      <span className="font-semibold text-purple-600">
-                        {stats.totalSubscribers?.toLocaleString()}
-                      </span>
-                    </div>
+                    {Object.entries(stats.expenseByCategory || {}).map(([category, amount]) => (
+                      <div key={category} className="flex justify-between items-center">
+                        <span className="text-gray-600 capitalize">{category}</span>
+                        <span className="font-semibold text-red-600">
+                          {formatCurrency(amount)}
+                        </span>
+                      </div>
+                    ))}
                     <div className="pt-2 border-t">
                       <div className="flex justify-between items-center">
-                        <span className="text-gray-600">Conversion Rate</span>
-                        <span className="font-semibold text-purple-600">
-                          {stats.conversionRate}%
+                        <span className="text-gray-700 font-medium">Total Expenses</span>
+                        <span className="font-bold text-red-900">
+                          {formatCurrency(stats.totalExpenses)}
                         </span>
                       </div>
                     </div>
@@ -231,7 +242,7 @@ export default function Dashboard() {
               </div>
 
               {/* Order Status & Payment Methods */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 lg:grid-cols-1">
                 <StatsCard title="Order Status Breakdown" icon={ShoppingCart}>
                   <div className="space-y-3">
                     {Object.entries(stats.orderStatusBreakdown || {}).map(([status, count]) => (
@@ -240,17 +251,6 @@ export default function Dashboard() {
                           <div className={`w-3 h-3 rounded-full ${getStatusColor(status)}`}></div>
                           <span className="text-gray-700 capitalize">{status}</span>
                         </div>
-                        <span className="font-semibold">{count}</span>
-                      </div>
-                    ))}
-                  </div>
-                </StatsCard>
-
-                <StatsCard title="Payment Methods" icon={CreditCard}>
-                  <div className="space-y-3">
-                    {Object.entries(stats.paymentMethodBreakdown || {}).map(([method, count]) => (
-                      <div key={method} className="flex justify-between items-center">
-                        <span className="text-gray-700 capitalize">{method}</span>
                         <span className="font-semibold">{count}</span>
                       </div>
                     ))}
@@ -309,12 +309,43 @@ export default function Dashboard() {
                 )}
               </div>
 
+              {/* Customer Insights */}
+              <StatsCard title="Customer Insights" icon={Users}>
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-600">New This Month</span>
+                    <span className="font-semibold text-green-600">
+                      {stats.newCustomersThisMonth?.toLocaleString()}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-600">New This Week</span>
+                    <span className="font-semibold text-blue-600">
+                      {stats.newCustomersLastWeek?.toLocaleString()}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-600">Newsletter Subscribers</span>
+                    <span className="font-semibold text-purple-600">
+                      {stats.totalSubscribers?.toLocaleString()}
+                    </span>
+                  </div>
+                  <div className="pt-2 border-t">
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-600">Conversion Rate</span>
+                      <span className="font-semibold text-purple-600">
+                        {stats.conversionRate}%</span>
+                    </div>
+                  </div>
+                </div>
+              </StatsCard>
+
               {/* Customer Locations */}
               {stats.customersByLocation && Object.keys(stats.customersByLocation).length > 0 && (
                 <StatsCard title="Customers by Location" icon={MapPin}>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {Object.entries(stats.customersByLocation)
-                      .sort(([,a], [,b]) => b - a)
+                      .sort(([, a], [, b]) => b - a)
                       .slice(0, 9)
                       .map(([location, count]) => (
                         <div key={location} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
@@ -329,7 +360,6 @@ export default function Dashboard() {
               {/* Stock Alerts */}
               {(stats.outOfStockProducts?.length > 0 || stats.lowStockProducts?.length > 0) && (
                 <div className="space-y-6">
-                  {/* Out of Stock Products */}
                   {stats.outOfStockProducts?.length > 0 && (
                     <StockAlertTable
                       title="Out of Stock Products"
@@ -338,7 +368,6 @@ export default function Dashboard() {
                     />
                   )}
 
-                  {/* Low Stock Products */}
                   {stats.lowStockProducts?.length > 0 && (
                     <StockAlertTable
                       title="Low Stock Products"
@@ -362,6 +391,7 @@ const KPICard = ({ title, value, change, icon: Icon, color = 'blue' }) => {
     blue: 'bg-blue-50 text-blue-600',
     purple: 'bg-purple-50 text-purple-600',
     indigo: 'bg-indigo-50 text-indigo-600',
+    red: 'bg-red-50 text-red-600'
   };
 
   return (
@@ -488,10 +518,9 @@ const getStatusColor = (status) => {
     shipped: 'bg-green-400',
     delivered: 'bg-green-600',
     cancelled: 'bg-red-400',
-    refunded: 'bg-gray-400',
+    refunded: 'bg-gray-400'
   };
   return colors[status.toLowerCase()] || 'bg-gray-400';
 };
-
 
 const formatPercentage = (value) => `${value > 0 ? '+' : ''}${value}%`;
