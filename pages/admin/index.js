@@ -16,7 +16,7 @@ import {
   Boxes
 } from 'lucide-react';
 
-// You'll need to import these components
+// Import these components with correct paths
 import AdminLayout from '../../components/layout/AdminLayout';
 import AuthCheck from '../../components/auth/AuthCheck';
 
@@ -36,6 +36,7 @@ export default function Dashboard() {
       setLastUpdated(new Date().toLocaleTimeString());
       setError(null);
     } catch (err) {
+      console.error('Error fetching stats:', err);
       setError(err.message);
     } finally {
       setLoading(false);
@@ -58,7 +59,7 @@ export default function Dashboard() {
         {loading && !stats && (
           <div className="flex items-center justify-center min-h-96">
             <div className="flex flex-col items-center space-y-4">
-              <RefreshCw className="w-8 h-8 animate-spin text-[#46c7c7]" />
+              <RefreshCw className="w-8 h-8 animate-spin text-blue-600" aria-label="Loading" />
               <p className="text-gray-600">Loading dashboard...</p>
             </div>
           </div>
@@ -68,13 +69,14 @@ export default function Dashboard() {
           <div className="flex items-center justify-center min-h-96">
             <div className="bg-white p-8 rounded-lg shadow-lg max-w-md w-full">
               <div className="flex items-center space-x-3 text-red-600 mb-4">
-                <AlertTriangle className="w-6 h-6" />
+                <AlertTriangle className="w-6 h-6" aria-label="Error" />
                 <h2 className="text-lg font-semibold">Error Loading Dashboard</h2>
               </div>
               <p className="text-gray-600 mb-4">{error}</p>
               <button
                 onClick={fetchStats}
-                className="w-full bg-[#46c7c7] text-white py-2 px-4 rounded-lg hover:bg-[#46c7c7] transition-colors"
+                className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors"
+                aria-label="Retry"
               >
                 Retry
               </button>
@@ -90,14 +92,15 @@ export default function Dashboard() {
               <p className="text-gray-600">
                 {lastUpdated && `Last updated: ${lastUpdated}`}
                 {stats?.dataQuality && !Object.values(stats.dataQuality).every(Boolean) && (
-                  <span className="ml-2 text-amber-600">⚠ Some data sources unavailable</span>
+                  <span className="ml-2 text-amber-600" aria-label="Warning">⚠ Some data sources unavailable</span>
                 )}
               </p>
             </div>
             <button
               onClick={fetchStats}
               disabled={loading}
-              className="flex items-center space-x-2 bg-[#46c7c7] text-white px-4 py-2 rounded-lg hover:bg-[#46c7c7] transition-colors disabled:opacity-50"
+              className="flex items-center space-x-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+              aria-label="Refresh"
             >
               <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
               <span>Refresh</span>
@@ -109,9 +112,9 @@ export default function Dashboard() {
               {/* KPI Cards */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 <KPICard
-                  title="Total Revenue"
-                  value={formatCurrency(stats.totalRevenue)}
-                  change={stats.revenueGrowth}
+                  title="Product Revenue"
+                  value={formatCurrency(stats.totalProductRevenue)}
+                  change={stats.productRevenueGrowth}
                   icon={DollarSign}
                   color="green"
                 />
@@ -137,33 +140,58 @@ export default function Dashboard() {
                 />
               </div>
 
-              {/* Revenue & Performance Charts */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Revenue Breakdown */}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <StatsCard title="Revenue Breakdown" icon={DollarSign}>
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-600">Product Revenue</span>
+                      <span className="font-semibold text-green-600">
+                        {formatCurrency(stats.totalProductRevenue)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-600">Shipping Revenue</span>
+                      <span className="font-semibold text-blue-600">
+                        {formatCurrency(stats.totalShippingRevenue)}
+                      </span>
+                    </div>
+                    <div className="pt-2 border-t">
+                      <div className="flex justify-between items-center">
+                        <span className="text-gray-700 font-medium">Total Revenue</span>
+                        <span className="font-bold text-gray-900">
+                          {formatCurrency(stats.totalRevenue)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </StatsCard>
+
                 <StatsCard title="Monthly Performance" icon={Calendar}>
                   <div className="space-y-4">
                     <div className="flex justify-between items-center">
-                      <span className="text-gray-600">This Month Revenue</span>
+                      <span className="text-gray-600">This Month Products</span>
                       <span className="font-semibold text-green-600">
-                        {formatCurrency(stats.currentMonthRevenue)}
+                        {formatCurrency(stats.currentMonthProductRevenue)}
                       </span>
                     </div>
                     <div className="flex justify-between items-center">
-                      <span className="text-gray-600">Last Month Revenue</span>
-                      <span className="font-semibold text-gray-900">
-                        {formatCurrency(stats.lastMonthRevenue)}
+                      <span className="text-gray-600">This Month Shipping</span>
+                      <span className="font-semibold text-blue-600">
+                        {formatCurrency(stats.currentMonthShippingRevenue)}
                       </span>
                     </div>
                     <div className="flex justify-between items-center">
-                      <span className="text-gray-600">Weekly Revenue</span>
-                      <span className="font-semibold text-[#46c7c7]">
+                      <span className="text-gray-600">Weekly Total</span>
+                      <span className="font-semibold text-purple-600">
                         {formatCurrency(stats.weeklyRevenue)}
                       </span>
                     </div>
                     <div className="pt-2 border-t">
                       <div className="flex justify-between items-center">
-                        <span className="text-gray-600">Conversion Rate</span>
-                        <span className="font-semibold text-purple-600">
-                          {stats.conversionRate}%
+                        <span className="text-gray-600">Product Growth</span>
+                        <span className={`font-semibold ${stats.productRevenueGrowth >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                          {formatPercentage(stats.productRevenueGrowth)}
                         </span>
                       </div>
                     </div>
@@ -180,7 +208,7 @@ export default function Dashboard() {
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-gray-600">New This Week</span>
-                      <span className="font-semibold text-[#46c7c7]">
+                      <span className="font-semibold text-blue-600">
                         {stats.newCustomersLastWeek?.toLocaleString()}
                       </span>
                     </div>
@@ -189,6 +217,14 @@ export default function Dashboard() {
                       <span className="font-semibold text-purple-600">
                         {stats.totalSubscribers?.toLocaleString()}
                       </span>
+                    </div>
+                    <div className="pt-2 border-t">
+                      <div className="flex justify-between items-center">
+                        <span className="text-gray-600">Conversion Rate</span>
+                        <span className="font-semibold text-purple-600">
+                          {stats.conversionRate}%
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </StatsCard>
@@ -228,7 +264,7 @@ export default function Dashboard() {
                   <div className="space-y-4">
                     <div className="flex justify-between items-center">
                       <span className="text-gray-600">Total Products</span>
-                      <span className="font-semibold text-[#46c7c7]">
+                      <span className="font-semibold text-blue-600">
                         {stats.totalProducts?.toLocaleString()}
                       </span>
                     </div>
@@ -283,7 +319,7 @@ export default function Dashboard() {
                       .map(([location, count]) => (
                         <div key={location} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
                           <span className="text-gray-700">{location}</span>
-                          <span className="font-semibold text-[#46c7c7]">{count}</span>
+                          <span className="font-semibold text-blue-600">{count}</span>
                         </div>
                       ))}
                   </div>
@@ -323,7 +359,7 @@ export default function Dashboard() {
 const KPICard = ({ title, value, change, icon: Icon, color = 'blue' }) => {
   const colorClasses = {
     green: 'bg-green-50 text-green-600',
-    blue: 'bg-blue-50 text-[#46c7c7]',
+    blue: 'bg-blue-50 text-blue-600',
     purple: 'bg-purple-50 text-purple-600',
     indigo: 'bg-indigo-50 text-indigo-600',
   };
@@ -337,9 +373,9 @@ const KPICard = ({ title, value, change, icon: Icon, color = 'blue' }) => {
           {change !== undefined && (
             <div className="flex items-center mt-2">
               {change >= 0 ? (
-                <TrendingUp className="w-4 h-4 text-green-500 mr-1" />
+                <TrendingUp className="w-4 h-4 text-green-500 mr-1" aria-label="Trending up" />
               ) : (
-                <TrendingDown className="w-4 h-4 text-red-500 mr-1" />
+                <TrendingDown className="w-4 h-4 text-red-500 mr-1" aria-label="Trending down" />
               )}
               <span className={`text-sm font-medium ${change >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                 {formatPercentage(change)}
@@ -349,7 +385,7 @@ const KPICard = ({ title, value, change, icon: Icon, color = 'blue' }) => {
           )}
         </div>
         <div className={`p-3 rounded-lg ${colorClasses[color]}`}>
-          <Icon className="w-6 h-6" />
+          <Icon className="w-6 h-6" aria-label={title} />
         </div>
       </div>
     </div>
@@ -359,7 +395,7 @@ const KPICard = ({ title, value, change, icon: Icon, color = 'blue' }) => {
 const StatsCard = ({ title, children, icon: Icon }) => (
   <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
     <div className="flex items-center space-x-2 mb-4">
-      {Icon && <Icon className="w-5 h-5 text-gray-600" />}
+      {Icon && <Icon className="w-5 h-5 text-gray-600" aria-label={title} />}
       <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
     </div>
     {children}
@@ -373,8 +409,8 @@ const StockAlertTable = ({ title, products, alertType }) => {
   };
 
   const alertIcons = {
-    outOfStock: <AlertTriangle className="w-5 h-5 text-red-600" />,
-    lowStock: <AlertTriangle className="w-5 h-5 text-amber-600" />
+    outOfStock: <AlertTriangle className="w-5 h-5 text-red-600" aria-label="Out of stock" />,
+    lowStock: <AlertTriangle className="w-5 h-5 text-amber-600" aria-label="Low stock" />
   };
 
   return (
@@ -448,7 +484,7 @@ const StockAlertTable = ({ title, products, alertType }) => {
 const getStatusColor = (status) => {
   const colors = {
     pending: 'bg-yellow-400',
-    processing: 'bg-[#46c7c7]',
+    processing: 'bg-blue-400',
     shipped: 'bg-green-400',
     delivered: 'bg-green-600',
     cancelled: 'bg-red-400',
@@ -456,4 +492,6 @@ const getStatusColor = (status) => {
   };
   return colors[status.toLowerCase()] || 'bg-gray-400';
 };
+
+
 const formatPercentage = (value) => `${value > 0 ? '+' : ''}${value}%`;
