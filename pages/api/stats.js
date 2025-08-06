@@ -6,107 +6,325 @@ export default async function handler(req, res) {
   }
 
   try {
-    const [
-      ordersSnapshot,
-      productsSnapshot,
-      subscribersSnapshot,
-      usersSnapshot
-    ] = await Promise.all([
+    // Enhanced data fetching with better error handling
+    const collections = await Promise.allSettled([
       adminDb.collection('orders').get(),
       adminDb.collection('products').get(),
       adminDb.collection('newsletter_signups').get(),
       adminDb.collection('users').get()
     ]);
 
-    // Order Statistics
+    // Check for failed collections and handle gracefully
+    const [ordersResult, productsResult, subscribersResult, usersResult] = collections;
+    
+    if (ordersResult.status === 'rejected') {
+      console.error('Failed to fetch orders:', ordersResult.reason);
+    }
+    if (productsResult.status === 'rejected') {
+      console.error('Failed to fetch products:', productsResult.reason);
+    }
+    if (subscribersResult.status === 'rejected') {
+      console.error('Failed to fetch subscribers:', subscribersResult.reason);
+    }
+    if (usersResult.status === 'rejected') {
+      console.error('Failed to fetch users:', usersResult.reason);
+    }
+
+    const ordersSnapshot = ordersResult.status === 'fulfilled' ? ordersResult.value : { docs: [], size: 0 };
+    const productsSnapshot = productsResult.status === 'fulfilled' ? productsResult.value : { docs: [], size: 0 };
+    const subscribersSnapshot = subscribersResult.status === 'fulfilled' ? subscribersResult.value : { docs: [], size: 0 };
+    const usersSnapshot = usersResult.status === 'fulfilled' ? usersResult.value : { docs: [], size: 0 };
+
+    // Enhanced date calculations
+    const now = new Date();
+    const oneMonthAgo = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
+    const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const startOfCurrentMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
+
+    // Enhanced Order Statistics with trends and insights
     const orderStats = ordersSnapshot.docs.reduce((acc, doc) => {
       const order = doc.data();
-      const amount = order.totalAmount || 0;
+      const amount = parseFloat(order.totalAmount) || 0;
+      const orderDate = order.createdAt?.toDate ? order.createdAt.toDate() : new Date(order.createdAt);
 
       // Status breakdown
       acc.statusCounts[order.status] = (acc.statusCounts[order.status] || 0) + 1;
 
-      // Revenue calculations for shipped orders
-      if (order.status === 'Shipped') {
-        acc.totalRevenue += amount;
-        acc.shippedOrdersCount++;
+      // Revenue calculations
+      acc.totalRevenue += amount;
+
+      // Monthly comparisons
+      if (orderDate >= startOfCurrentMonth) {
+        acc.currentMonthRevenue += amount;
+        acc.currentMonthOrders++;
+      }
+
+      if (orderDate >= startOfLastMonth && orderDate <= endOfLastMonth) {
+        acc.lastMonthRevenue += amount;
+        acc.lastMonthOrders++;
+      }
+
+      // Weekly tracking
+      if (orderDate >= oneWeekAgo) {
+        acc.weeklyRevenue += amount;
+        acc.weeklyOrders++;
+      }
+
+      // Average order value calculation
+      acc.totalOrderValue += amount;
+
+      // Popular payment methods
+      if (order.paymentMethod) {
+        acc.paymentMethods[order.paymentMethod] = (acc.paymentMethods[order.paymentMethod] || 0) + 1;
       }
 
       return acc;
     }, {
       totalRevenue: 0,
-      shippedOrdersCount: 0,
-      statusCounts: {}
+      currentMonthRevenue: 0,
+      lastMonthRevenue: 0,
+      weeklyRevenue: 0,
+      statusCounts: {},
+      currentMonthOrders: 0,
+      lastMonthOrders: 0,
+      weeklyOrders: 0,
+      totalOrderValue: 0,
+      paymentMethods: {}
     });
 
-    // Adapted for the new structure where stock is nested under each color.
-    // Product Statistics - Build a table for products with ANY size out of stock.
-const outOfStockProducts = productsSnapshot.docs.reduce((acc, doc) => {
-  const product = doc.data();
+    // Calculate revenue growth
+    const revenueGrowth = orderStats.lastMonthRevenue > 0 
+      ? ((orderStats.currentMonthRevenue - orderStats.lastMonthRevenue) / orderStats.lastMonthRevenue * 100).toFixed(1)
+      : orderStats.currentMonthRevenue > 0 ? 100 : 0;
 
-  // Ensure product.colors is a valid array
-  if (!Array.isArray(product.colors)) return acc;
+    const ordersGrowth = orderStats.lastMonthOrders > 0
+      ? ((orderStats.currentMonthOrders - orderStats.lastMonthOrders) / orderStats.lastMonthOrders * 100).toFixed(1)
+      : orderStats.currentMonthOrders > 0 ? 100 : 0;
 
-  // Iterate through each color and check stock for each size.
-  const colorsOutOfStock = product.colors.map(color => {
-    // Ensure color.stock exists as an object
-    const stock = color.stock || {};
-    const outOfStockSizes = Object.entries(stock).filter(([size, qty]) => qty <= 0);
-    if (outOfStockSizes.length > 0) {
-      return {
-        color: color.name,
-        outOfStockSizes: outOfStockSizes.reduce((obj, [size, qty]) => {
-          obj[size] = qty;
-          return obj;
-        }, {})
-      };
-    }
-    return null;
-  }).filter(colorInfo => colorInfo !== null);
+    // Enhanced Product Analytics
+    const productAnalytics = productsSnapshot.docs.reduce((acc, doc) => {
+      const product = doc.data();
+      
+      if (!Array.isArray(product.colors)) return acc;
 
-  if (colorsOutOfStock.length > 0) {
-    acc.push({
-      name: product.name,
-      outOfStockDetails: colorsOutOfStock
+      let totalStock = 0;
+      let lowStockItems = 0;
+      const outOfStockColors = [];
+      const lowStockColors = [];
+
+      product.colors.forEach(color => {
+        const stock = color.stock || {};
+        let colorTotalStock = 0;
+        const outOfStockSizes = {};
+        const lowStockSizes = {};
+
+        Object.entries(stock).forEach(([size, qty]) => {
+          const quantity = parseInt(qty) || 0;
+          colorTotalStock += quantity;
+          totalStock += quantity;
+
+          if (quantity === 0) {
+            outOfStockSizes[size] = quantity;
+          } else if (quantity <= 2 && quantity > 0) { // Low stock threshold
+            lowStockSizes[size] = quantity;
+            lowStockItems++;
+          }
+        });
+
+        if (Object.keys(outOfStockSizes).length > 0) {
+          outOfStockColors.push({
+            color: color.name,
+            outOfStockSizes
+          });
+        }
+
+        if (Object.keys(lowStockSizes).length > 0) {
+          lowStockColors.push({
+            color: color.name,
+            lowStockSizes
+          });
+        }
+      });
+
+      // Track products by stock status
+      if (outOfStockColors.length > 0) {
+        acc.outOfStockProducts.push({
+          name: product.name,
+          id: doc.id,
+          outOfStockDetails: outOfStockColors,
+          totalStock
+        });
+      }
+
+      if (lowStockColors.length > 0) {
+        acc.lowStockProducts.push({
+          name: product.name,
+          id: doc.id,
+          lowStockDetails: lowStockColors,
+          totalStock
+        });
+      }
+
+      // Category analytics
+      if (product.category) {
+        acc.categoryCounts[product.category] = (acc.categoryCounts[product.category] || 0) + 1;
+      }
+
+      acc.totalInventoryValue += (product.price || 0) * totalStock;
+      acc.totalStockUnits += totalStock;
+
+      return acc;
+    }, {
+      outOfStockProducts: [],
+      lowStockProducts: [],
+      categoryCounts: {},
+      totalInventoryValue: 0,
+      totalStockUnits: 0
     });
-  }
-  return acc;
-}, []);
 
+    // Enhanced Customer Analytics
+    const customerAnalytics = usersSnapshot.docs.reduce((acc, doc) => {
+      const user = doc.data();
+      const createdAt = user.createdAt?.toDate ? user.createdAt.toDate() : new Date(user.createdAt);
 
-    // Customer Statistics
-    const now = new Date();
-    const oneMonthAgo = new Date(now.setMonth(now.getMonth() - 1));
+      // Monthly growth tracking
+      if (createdAt >= oneMonthAgo) {
+        acc.newCustomersLastMonth++;
+      }
 
-    const uniqueCustomers = usersSnapshot.size;
-    const newCustomers = usersSnapshot.docs.filter(doc => {
-      const { createdAt } = doc.data();
-      const createdAtDate = createdAt?.toDate ? createdAt.toDate() : new Date(createdAt);
-      return createdAtDate >= oneMonthAgo;
-    }).length;
+      if (createdAt >= oneWeekAgo) {
+        acc.newCustomersLastWeek++;
+      }
 
-    // Final metrics
+      if (createdAt >= startOfCurrentMonth) {
+        acc.newCustomersThisMonth++;
+      }
+
+      if (createdAt >= startOfLastMonth && createdAt <= endOfLastMonth) {
+        acc.newCustomersLastMonthPrevious++;
+      }
+
+      // Location analytics (if available)
+      if (user.city || user.governorate) {
+        const location = user.governorate || user.city || 'Unknown';
+        acc.customersByLocation[location] = (acc.customersByLocation[location] || 0) + 1;
+      }
+
+      return acc;
+    }, {
+      newCustomersLastMonth: 0,
+      newCustomersLastWeek: 0,
+      newCustomersThisMonth: 0,
+      newCustomersLastMonthPrevious: 0,
+      customersByLocation: {}
+    });
+
+    // Calculate customer growth rate
+    const customerGrowth = customerAnalytics.newCustomersLastMonthPrevious > 0
+      ? ((customerAnalytics.newCustomersThisMonth - customerAnalytics.newCustomersLastMonthPrevious) / customerAnalytics.newCustomersLastMonthPrevious * 100).toFixed(1)
+      : customerAnalytics.newCustomersThisMonth > 0 ? 100 : 0;
+
+    // Newsletter analytics
+    const newsletterStats = subscribersSnapshot.docs.reduce((acc, doc) => {
+      const subscriber = doc.data();
+      const subscribedAt = subscriber.createdAt?.toDate ? subscriber.createdAt.toDate() : new Date(subscriber.subscribedAt || subscriber.createdAt);
+
+      if (subscribedAt >= oneMonthAgo) {
+        acc.newSubscribersLastMonth++;
+      }
+
+      if (subscribedAt >= oneWeekAgo) {
+        acc.newSubscribersLastWeek++;
+      }
+
+      return acc;
+    }, {
+      newSubscribersLastMonth: 0,
+      newSubscribersLastWeek: 0
+    });
+
+    // Calculate key performance indicators
+    const averageOrderValue = ordersSnapshot.size > 0 
+      ? (orderStats.totalOrderValue / ordersSnapshot.size).toFixed(2)
+      : 0;
+
+    const conversionRate = usersSnapshot.size > 0
+      ? ((ordersSnapshot.size / usersSnapshot.size) * 100).toFixed(2)
+      : 0;
+
+    // Compile comprehensive stats
     const stats = {
-      // Order stats
+      // Enhanced order metrics
       totalOrders: ordersSnapshot.size,
-      totalRevenue: orderStats.totalRevenue,
+      totalRevenue: parseFloat(orderStats.totalRevenue.toFixed(2)),
+      currentMonthRevenue: parseFloat(orderStats.currentMonthRevenue.toFixed(2)),
+      lastMonthRevenue: parseFloat(orderStats.lastMonthRevenue.toFixed(2)),
+      weeklyRevenue: parseFloat(orderStats.weeklyRevenue.toFixed(2)),
+      revenueGrowth: parseFloat(revenueGrowth),
+      ordersGrowth: parseFloat(ordersGrowth),
+      averageOrderValue: parseFloat(averageOrderValue),
       orderStatusBreakdown: orderStats.statusCounts,
+      paymentMethodBreakdown: orderStats.paymentMethods,
 
-      // Customer stats
-      totalCustomers: uniqueCustomers,
-      newCustomers,
+      // Enhanced customer metrics
+      totalCustomers: usersSnapshot.size,
+      newCustomers: customerAnalytics.newCustomersLastMonth,
+      newCustomersThisMonth: customerAnalytics.newCustomersThisMonth,
+      newCustomersLastWeek: customerAnalytics.newCustomersLastWeek,
+      customerGrowth: parseFloat(customerGrowth),
+      customersByLocation: customerAnalytics.customersByLocation,
+      conversionRate: parseFloat(conversionRate),
 
-      // Product stats
+      // Enhanced product metrics
       totalProducts: productsSnapshot.size,
-      outOfStockProducts, // Table of out-of-stock products with color and size details
+      outOfStockProducts: productAnalytics.outOfStockProducts,
+      lowStockProducts: productAnalytics.lowStockProducts,
+      totalStockUnits: productAnalytics.totalStockUnits,
+      totalInventoryValue: parseFloat(productAnalytics.totalInventoryValue.toFixed(2)),
+      productsByCategory: productAnalytics.categoryCounts,
 
-      // Subscription stats
-      totalSubscribers: subscribersSnapshot.size
+      // Newsletter metrics
+      totalSubscribers: subscribersSnapshot.size,
+      newSubscribersLastMonth: newsletterStats.newSubscribersLastMonth,
+      newSubscribersLastWeek: newsletterStats.newSubscribersLastWeek,
+
+      // Performance indicators
+      kpis: {
+        totalRevenue: parseFloat(orderStats.totalRevenue.toFixed(2)),
+        totalOrders: ordersSnapshot.size,
+        totalCustomers: usersSnapshot.size,
+        averageOrderValue: parseFloat(averageOrderValue),
+        conversionRate: parseFloat(conversionRate),
+        revenueGrowth: parseFloat(revenueGrowth),
+        customerGrowth: parseFloat(customerGrowth)
+      },
+
+      // Data freshness indicator
+      lastUpdated: new Date().toISOString(),
+      dataQuality: {
+        ordersAvailable: ordersResult.status === 'fulfilled',
+        productsAvailable: productsResult.status === 'fulfilled',
+        usersAvailable: usersResult.status === 'fulfilled',
+        subscribersAvailable: subscribersResult.status === 'fulfilled'
+      }
     };
 
+    // Set appropriate cache headers for performance
+    res.setHeader('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=600');
+    
     res.status(200).json(stats);
   } catch (error) {
     console.error('Error fetching stats:', error);
-    res.status(500).json({ message: 'Internal server error' });
+    
+    // Return more detailed error information in development
+    const isDev = process.env.NODE_ENV === 'development';
+    
+    res.status(500).json({ 
+      message: 'Internal server error',
+      error: isDev ? error.message : undefined,
+      timestamp: new Date().toISOString()
+    });
   }
 }
