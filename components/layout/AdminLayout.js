@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { LogOut, Home, Package, ShoppingCart, Mail, Menu, X } from 'lucide-react';
+import { LogOut, Home, Package, ShoppingCart,ShoppingBag, Mail, Menu, X } from 'lucide-react';
 import { useAuth } from '../../contexts/authContext';
 import { authService } from '../../lib/auth';
 
@@ -25,6 +25,7 @@ export default function AdminLayout({ children }) {
 
   const menuItems = [
     { title: 'Dashboard', icon: <Home size={22} />, path: '/admin' },
+    { title: 'Offline Management', icon: <ShoppingBag size={22} />, path: '/admin/offline-management' },
     { title: 'Products', icon: <Package size={22} />, path: '/admin/products' },
     { title: 'Orders', icon: <ShoppingCart size={22} />, path: '/admin/orders' },
     { title: 'Newsletter', icon: <Mail size={22} />, path: '/admin/newsletter' },
