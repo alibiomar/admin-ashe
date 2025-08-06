@@ -2,7 +2,7 @@ import { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import AdminLayout from "../../components/layout/AdminLayout";
 import AuthCheck from "../../components/auth/AuthCheck";
 import { db } from "../../lib/firebaseClient";
-import { collection, onSnapshot, doc, updateDoc, query, orderBy, limit, startAfter, getDocs } from "firebase/firestore";
+import { collection, onSnapshot, doc, updateDoc, query, orderBy, getDocs } from "firebase/firestore";
 import { FiPackage, FiTruck, FiClock, FiXCircle, FiCheckCircle, FiUser, FiPhone, FiSearch } from "react-icons/fi";
 
 export default function Orders() {
@@ -12,10 +12,7 @@ export default function Orders() {
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [activeTab, setActiveTab] = useState("new");
   const [searchQuery, setSearchQuery] = useState("");
-  const [currentPage, setCurrentPage] = useState(1);
-  const [ordersPerPage] = useState(10);
-  const [lastDoc, setLastDoc] = useState(null);
-  const [hasMore, setHasMore] = useState(true);
+  const [displayLimit, setDisplayLimit] = useState(20); // How many orders to show at once
 
   const modalRef = useRef(null);
 
@@ -36,24 +33,18 @@ export default function Orders() {
     };
   }, [selectedOrder]);
 
-  // Fetch orders with proper pagination
+  // Reset display limit when changing tabs or search
+  useEffect(() => {
+    setDisplayLimit(20);
+  }, [activeTab, searchQuery]);
+
+  // Fetch all orders (without pagination limit for now to show all orders)
   useEffect(() => {
     const fetchOrders = async () => {
       try {
         setLoading(true);
         const ordersCollection = collection(db, "orders");
-        let q;
-
-        if (currentPage === 1) {
-          q = query(ordersCollection, orderBy("createdAt", "desc"), limit(ordersPerPage));
-        } else {
-          q = query(
-            ordersCollection, 
-            orderBy("createdAt", "desc"), 
-            startAfter(lastDoc), 
-            limit(ordersPerPage)
-          );
-        }
+        const q = query(ordersCollection, orderBy("createdAt", "desc"));
 
         const snapshot = await getDocs(q);
         const ordersData = snapshot.docs.map((doc) => ({
@@ -62,14 +53,7 @@ export default function Orders() {
           createdAt: doc.data().createdAt?.toDate?.() || new Date(doc.data().createdAt || Date.now())
         }));
 
-        if (currentPage === 1) {
-          setOrders(ordersData);
-        } else {
-          setOrders(prev => [...prev, ...ordersData]);
-        }
-
-        setLastDoc(snapshot.docs[snapshot.docs.length - 1]);
-        setHasMore(snapshot.docs.length === ordersPerPage);
+        setOrders(ordersData);
         setLoading(false);
       } catch (err) {
         setError("Failed to fetch orders.");
@@ -79,7 +63,7 @@ export default function Orders() {
     };
 
     fetchOrders();
-  }, [currentPage, ordersPerPage]);
+  }, []);
 
   // Real-time updates for order status changes
   useEffect(() => {
@@ -367,12 +351,34 @@ export default function Orders() {
   };
 
   const getCurrentOrders = () => {
-    switch (activeTab) {
-      case "new": return newOrders;
-      case "shipped": return shippedOrders;
-      case "pending": return pendingOrders;
-      default: return newOrders;
-    }
+    const orders = (() => {
+      switch (activeTab) {
+        case "new": return newOrders;
+        case "shipped": return shippedOrders;
+        case "pending": return pendingOrders;
+        default: return newOrders;
+      }
+    })();
+    
+    // Apply display limit
+    return orders.slice(0, displayLimit);
+  };
+
+  const hasMoreToShow = () => {
+    const totalOrders = (() => {
+      switch (activeTab) {
+        case "new": return newOrders.length;
+        case "shipped": return shippedOrders.length;
+        case "pending": return pendingOrders.length;
+        default: return newOrders.length;
+      }
+    })();
+    
+    return totalOrders > displayLimit;
+  };
+
+  const loadMore = () => {
+    setDisplayLimit(prev => prev + 20);
   };
 
   const currentOrders = getCurrentOrders();
@@ -441,9 +447,29 @@ export default function Orders() {
               )}
             </div>
           ) : (
-            <div className="space-y-4">
-              {currentOrders.map(renderOrderCard)}
-            </div>
+            <>
+              <div className="space-y-4">
+                {currentOrders.map(renderOrderCard)}
+              </div>
+              
+              {hasMoreToShow() && (
+                <div className="flex justify-center mt-6">
+                  <button
+                    onClick={loadMore}
+                    className="px-6 py-2 bg-[#46c7c7] text-white rounded-xl hover:bg-[#3aa8a8] transition-colors"
+                  >
+                    Load More ({(() => {
+                      switch (activeTab) {
+                        case "new": return newOrders.length - displayLimit;
+                        case "shipped": return shippedOrders.length - displayLimit;
+                        case "pending": return pendingOrders.length - displayLimit;
+                        default: return 0;
+                      }
+                    })()} more)
+                  </button>
+                </div>
+              )}
+            </>
           )}
 
           {selectedOrder && renderShippingModal()}
