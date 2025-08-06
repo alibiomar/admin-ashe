@@ -6,7 +6,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Enhanced data fetching with better error handling
+    // Fetch collections
     const collections = await Promise.allSettled([
       adminDb.collection('orders').get(),
       adminDb.collection('products').get(),
@@ -16,7 +16,7 @@ export default async function handler(req, res) {
       adminDb.collection('spendings').get()
     ]);
 
-    // Check for failed collections and handle gracefully
+    // Extract results with error handling
     const [ordersResult, productsResult, subscribersResult, usersResult, offlineSalesResult, spendingsResult] = collections;
 
     if (ordersResult.status === 'rejected') {
@@ -45,7 +45,12 @@ export default async function handler(req, res) {
     const offlineSalesSnapshot = offlineSalesResult.status === 'fulfilled' ? offlineSalesResult.value : { docs: [], size: 0 };
     const spendingsSnapshot = spendingsResult.status === 'fulfilled' ? spendingsResult.value : { docs: [], size: 0 };
 
-    // Enhanced date calculations
+    // Log collection sizes for debugging
+    console.log('Orders count:', ordersSnapshot.size);
+    console.log('Offline sales count:', offlineSalesSnapshot.size);
+    console.log('Spendings count:', spendingsSnapshot.size);
+
+    // Date calculations
     const now = new Date();
     const oneMonthAgo = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
     const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
@@ -53,27 +58,25 @@ export default async function handler(req, res) {
     const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
     const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
 
-    // Enhanced Order Statistics with trends and insights
-    const SHIPPING_FEE = 8; // 8 TND shipping fee
+    // Order Statistics
+    const SHIPPING_FEE = 8;
 
     const orderStats = ordersSnapshot.docs.reduce((acc, doc) => {
       const order = doc.data();
       const totalAmount = parseFloat(order.totalAmount) || 0;
-      const orderDate = order.createdAt?.toDate ? order.createdAt.toDate() : new Date(order.createdAt);
+      const orderDate = order.createdAt?.toDate ? order.createdAt.toDate() : new Date(order.createdAt || now);
 
-      // Separate product revenue from shipping fees
+      // Log order data for debugging
+      console.log('Order ID:', doc.id, 'Total Amount:', totalAmount, 'Created At:', orderDate);
+
       const productRevenue = Math.max(0, totalAmount - SHIPPING_FEE);
       const shippingRevenue = totalAmount > 0 ? SHIPPING_FEE : 0;
 
-      // Status breakdown
       acc.statusCounts[order.status] = (acc.statusCounts[order.status] || 0) + 1;
-
-      // Revenue calculations (product revenue only)
       acc.totalOnlineProductRevenue += productRevenue;
       acc.totalOnlineShippingRevenue += shippingRevenue;
       acc.totalOnlineRevenue += totalAmount;
 
-      // Monthly comparisons
       if (orderDate >= startOfCurrentMonth) {
         acc.currentMonthOnlineProductRevenue += productRevenue;
         acc.currentMonthOnlineShippingRevenue += shippingRevenue;
@@ -88,7 +91,6 @@ export default async function handler(req, res) {
         acc.lastMonthOrders++;
       }
 
-      // Weekly tracking
       if (orderDate >= oneWeekAgo) {
         acc.weeklyOnlineProductRevenue += productRevenue;
         acc.weeklyOnlineShippingRevenue += shippingRevenue;
@@ -96,10 +98,8 @@ export default async function handler(req, res) {
         acc.weeklyOrders++;
       }
 
-      // Average order value calculation (total amount)
       acc.totalOnlineOrderValue += totalAmount;
 
-      // Popular payment methods
       if (order.paymentMethod) {
         acc.paymentMethods[order.paymentMethod] = (acc.paymentMethods[order.paymentMethod] || 0) + 1;
       }
@@ -126,17 +126,18 @@ export default async function handler(req, res) {
       paymentMethods: {}
     });
 
+    // Log order stats for debugging
+    console.log('Order Stats:', orderStats);
+
     // Offline Sales Statistics
     const offlineSalesStats = offlineSalesSnapshot.docs.reduce((acc, doc) => {
       const sale = doc.data();
       const totalAmount = parseFloat(sale.totalAmount) || 0;
-      const saleDate = sale.saleDate?.toDate ? sale.saleDate.toDate() : new Date(sale.saleDate);
+      const saleDate = sale.saleDate?.toDate ? sale.saleDate.toDate() : new Date(sale.saleDate || now);
 
-      // No shipping fee for offline sales
       acc.totalOfflineProductRevenue += totalAmount;
       acc.totalOfflineRevenue += totalAmount;
 
-      // Monthly comparisons
       if (saleDate >= startOfCurrentMonth) {
         acc.currentMonthOfflineProductRevenue += totalAmount;
         acc.currentMonthOfflineRevenue += totalAmount;
@@ -149,14 +150,12 @@ export default async function handler(req, res) {
         acc.lastMonthSales++;
       }
 
-      // Weekly tracking
       if (saleDate >= oneWeekAgo) {
         acc.weeklyOfflineProductRevenue += totalAmount;
         acc.weeklyOfflineRevenue += totalAmount;
         acc.weeklySales++;
       }
 
-      // Average sale value
       acc.totalOfflineSaleValue += totalAmount;
 
       return acc;
@@ -175,15 +174,17 @@ export default async function handler(req, res) {
       totalOfflineSaleValue: 0
     });
 
+    // Log offline sales stats for debugging
+    console.log('Offline Sales Stats:', offlineSalesStats);
+
     // Spending Statistics
     const spendingStats = spendingsSnapshot.docs.reduce((acc, doc) => {
       const spending = doc.data();
       const amount = parseFloat(spending.amount) || 0;
-      const spendingDate = spending.date?.toDate ? spending.date.toDate() : new Date(spending.date);
+      const spendingDate = spending.date?.toDate ? spending.date.toDate() : new Date(spending.date || now);
 
       acc.totalExpenses += amount;
 
-      // Monthly comparisons
       if (spendingDate >= startOfCurrentMonth) {
         acc.currentMonthExpenses += amount;
       }
@@ -192,12 +193,10 @@ export default async function handler(req, res) {
         acc.lastMonthExpenses += amount;
       }
 
-      // Weekly tracking
       if (spendingDate >= oneWeekAgo) {
         acc.weeklyExpenses += amount;
       }
 
-      // Category breakdown
       if (spending.category) {
         acc.expenseByCategory[spending.category] = (acc.expenseByCategory[spending.category] || 0) + amount;
       }
@@ -211,10 +210,19 @@ export default async function handler(req, res) {
       expenseByCategory: {}
     });
 
-    // Calculate growth metrics
+    // Log spending stats for debugging
+    console.log('Spending Stats:', spendingStats);
+
+    // Calculate combined metrics
     const totalProductRevenue = orderStats.totalOnlineProductRevenue + offlineSalesStats.totalOfflineProductRevenue;
     const totalRevenue = orderStats.totalOnlineRevenue + offlineSalesStats.totalOfflineRevenue;
-    const totalShippingRevenue = orderStats.totalOnlineShippingRevenue; // No shipping for offline
+    const totalShippingRevenue = orderStats.totalOnlineShippingRevenue;
+
+    // Log combined metrics for debugging
+    console.log('Total Product Revenue:', totalProductRevenue);
+    console.log('Total Revenue:', totalRevenue);
+    console.log('Total Shipping Revenue:', totalShippingRevenue);
+
     const productRevenueGrowth = (orderStats.lastMonthOnlineProductRevenue + offlineSalesStats.lastMonthOfflineProductRevenue) > 0
       ? (((orderStats.currentMonthOnlineProductRevenue + offlineSalesStats.currentMonthOfflineProductRevenue) - 
           (orderStats.lastMonthOnlineProductRevenue + offlineSalesStats.lastMonthOfflineProductRevenue)) / 
@@ -237,7 +245,7 @@ export default async function handler(req, res) {
       ? ((spendingStats.currentMonthExpenses - spendingStats.lastMonthExpenses) / spendingStats.lastMonthExpenses * 100).toFixed(1)
       : spendingStats.currentMonthExpenses > 0 ? 100 : 0;
 
-    // Enhanced Product Analytics
+    // Product Analytics
     const productAnalytics = productsSnapshot.docs.reduce((acc, doc) => {
       const product = doc.data();
 
@@ -316,10 +324,10 @@ export default async function handler(req, res) {
       totalStockUnits: 0
     });
 
-    // Enhanced Customer Analytics
+    // Customer Analytics
     const customerAnalytics = usersSnapshot.docs.reduce((acc, doc) => {
       const user = doc.data();
-      const createdAt = user.createdAt?.toDate ? user.createdAt.toDate() : new Date(user.createdAt);
+      const createdAt = user.createdAt?.toDate ? user.createdAt.toDate() : new Date(user.createdAt || now);
 
       if (createdAt >= oneMonthAgo) {
         acc.newCustomersLastMonth++;
@@ -351,15 +359,14 @@ export default async function handler(req, res) {
       customersByLocation: {}
     });
 
-    // Calculate customer growth rate
     const customerGrowth = customerAnalytics.newCustomersLastMonthPrevious > 0
       ? ((customerAnalytics.newCustomersThisMonth - customerAnalytics.newCustomersLastMonthPrevious) / customerAnalytics.newCustomersLastMonthPrevious * 100).toFixed(1)
       : customerAnalytics.newCustomersThisMonth > 0 ? 100 : 0;
 
-    // Newsletter analytics
+    // Newsletter Analytics
     const newsletterStats = subscribersSnapshot.docs.reduce((acc, doc) => {
       const subscriber = doc.data();
-      const subscribedAt = subscriber.createdAt?.toDate ? subscriber.createdAt.toDate() : new Date(subscriber.subscribedAt || subscriber.createdAt);
+      const subscribedAt = subscriber.createdAt?.toDate ? subscriber.createdAt.toDate() : new Date(subscriber.subscribedAt || subscriber.createdAt || now);
 
       if (subscribedAt >= oneMonthAgo) {
         acc.newSubscribersLastMonth++;
@@ -375,7 +382,7 @@ export default async function handler(req, res) {
       newSubscribersLastWeek: 0
     });
 
-    // Calculate key performance indicators
+    // Key Performance Indicators
     const totalOrdersAndSales = ordersSnapshot.size + offlineSalesSnapshot.size;
     const averageOrderValue = totalOrdersAndSales > 0
       ? ((orderStats.totalOnlineOrderValue + offlineSalesStats.totalOfflineSaleValue) / totalOrdersAndSales).toFixed(2)
@@ -387,13 +394,14 @@ export default async function handler(req, res) {
 
     const netProfit = totalRevenue - spendingStats.totalExpenses;
 
-    // Compile comprehensive stats
+    // Compile response
     const stats = {
-      // Combined order and offline sales metrics
       totalOrders: totalOrdersAndSales,
       totalRevenue: parseFloat(totalRevenue.toFixed(2)),
       totalProductRevenue: parseFloat(totalProductRevenue.toFixed(2)),
       totalShippingRevenue: parseFloat(totalShippingRevenue.toFixed(2)),
+      totalOnlineProductRevenue: parseFloat(orderStats.totalOnlineProductRevenue.toFixed(2)),
+      totalOfflineProductRevenue: parseFloat(offlineSalesStats.totalOfflineProductRevenue.toFixed(2)),
       currentMonthRevenue: parseFloat((orderStats.currentMonthOnlineRevenue + offlineSalesStats.currentMonthOfflineRevenue).toFixed(2)),
       currentMonthProductRevenue: parseFloat((orderStats.currentMonthOnlineProductRevenue + offlineSalesStats.currentMonthOfflineProductRevenue).toFixed(2)),
       currentMonthShippingRevenue: parseFloat(orderStats.currentMonthOnlineShippingRevenue.toFixed(2)),
@@ -410,8 +418,6 @@ export default async function handler(req, res) {
       orderStatusBreakdown: orderStats.statusCounts,
       paymentMethodBreakdown: orderStats.paymentMethods,
       shippingFee: SHIPPING_FEE,
-
-      // Spending metrics
       totalExpenses: parseFloat(spendingStats.totalExpenses.toFixed(2)),
       currentMonthExpenses: parseFloat(spendingStats.currentMonthExpenses.toFixed(2)),
       lastMonthExpenses: parseFloat(spendingStats.lastMonthExpenses.toFixed(2)),
@@ -419,8 +425,6 @@ export default async function handler(req, res) {
       expensesGrowth: parseFloat(expensesGrowth),
       expenseByCategory: spendingStats.expenseByCategory,
       netProfit: parseFloat(netProfit.toFixed(2)),
-
-      // Enhanced customer metrics
       totalCustomers: usersSnapshot.size,
       newCustomers: customerAnalytics.newCustomersLastMonth,
       newCustomersThisMonth: customerAnalytics.newCustomersThisMonth,
@@ -428,21 +432,15 @@ export default async function handler(req, res) {
       customerGrowth: parseFloat(customerGrowth),
       customersByLocation: customerAnalytics.customersByLocation,
       conversionRate: parseFloat(conversionRate),
-
-      // Enhanced product metrics
       totalProducts: productsSnapshot.size,
       outOfStockProducts: productAnalytics.outOfStockProducts,
       lowStockProducts: productAnalytics.lowStockProducts,
       totalStockUnits: productAnalytics.totalStockUnits,
       totalInventoryValue: parseFloat(productAnalytics.totalInventoryValue.toFixed(2)),
       productsByCategory: productAnalytics.categoryCounts,
-
-      // Newsletter metrics
       totalSubscribers: subscribersSnapshot.size,
       newSubscribersLastMonth: newsletterStats.newSubscribersLastMonth,
       newSubscribersLastWeek: newsletterStats.newSubscribersLastWeek,
-
-      // Performance indicators
       kpis: {
         totalRevenue: parseFloat(totalRevenue.toFixed(2)),
         totalProductRevenue: parseFloat(totalProductRevenue.toFixed(2)),
@@ -458,8 +456,6 @@ export default async function handler(req, res) {
         customerGrowth: parseFloat(customerGrowth),
         expensesGrowth: parseFloat(expensesGrowth)
       },
-
-      // Data freshness indicator
       lastUpdated: new Date().toISOString(),
       dataQuality: {
         ordersAvailable: ordersResult.status === 'fulfilled',
@@ -471,12 +467,18 @@ export default async function handler(req, res) {
       }
     };
 
+    // Log final stats for debugging
+    console.log('Final Stats:', {
+      totalProductRevenue: stats.totalProductRevenue,
+      totalOnlineProductRevenue: stats.totalOnlineProductRevenue,
+      totalOfflineProductRevenue: stats.totalOfflineProductRevenue,
+      dataQuality: stats.dataQuality
+    });
+
     res.status(200).json(stats);
   } catch (error) {
     console.error('Error fetching stats:', error);
-
     const isDev = process.env.NODE_ENV === 'development';
-
     res.status(500).json({
       message: 'Internal server error',
       error: isDev ? error.message : undefined,
