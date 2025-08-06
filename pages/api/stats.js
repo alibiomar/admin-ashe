@@ -11,12 +11,14 @@ export default async function handler(req, res) {
       adminDb.collection('orders').get(),
       adminDb.collection('products').get(),
       adminDb.collection('newsletter_signups').get(),
-      adminDb.collection('users').get()
+      adminDb.collection('users').get(),
+      adminDb.collection('offline_sales').get(),
+      adminDb.collection('spendings').get()
     ]);
 
     // Check for failed collections and handle gracefully
-    const [ordersResult, productsResult, subscribersResult, usersResult] = collections;
-    
+    const [ordersResult, productsResult, subscribersResult, usersResult, offlineSalesResult, spendingsResult] = collections;
+
     if (ordersResult.status === 'rejected') {
       console.error('Failed to fetch orders:', ordersResult.reason);
     }
@@ -29,11 +31,19 @@ export default async function handler(req, res) {
     if (usersResult.status === 'rejected') {
       console.error('Failed to fetch users:', usersResult.reason);
     }
+    if (offlineSalesResult.status === 'rejected') {
+      console.error('Failed to fetch offline sales:', offlineSalesResult.reason);
+    }
+    if (spendingsResult.status === 'rejected') {
+      console.error('Failed to fetch spendings:', spendingsResult.reason);
+    }
 
     const ordersSnapshot = ordersResult.status === 'fulfilled' ? ordersResult.value : { docs: [], size: 0 };
     const productsSnapshot = productsResult.status === 'fulfilled' ? productsResult.value : { docs: [], size: 0 };
     const subscribersSnapshot = subscribersResult.status === 'fulfilled' ? subscribersResult.value : { docs: [], size: 0 };
     const usersSnapshot = usersResult.status === 'fulfilled' ? usersResult.value : { docs: [], size: 0 };
+    const offlineSalesSnapshot = offlineSalesResult.status === 'fulfilled' ? offlineSalesResult.value : { docs: [], size: 0 };
+    const spendingsSnapshot = spendingsResult.status === 'fulfilled' ? spendingsResult.value : { docs: [], size: 0 };
 
     // Enhanced date calculations
     const now = new Date();
@@ -45,12 +55,12 @@ export default async function handler(req, res) {
 
     // Enhanced Order Statistics with trends and insights
     const SHIPPING_FEE = 8; // 8 TND shipping fee
-    
+
     const orderStats = ordersSnapshot.docs.reduce((acc, doc) => {
       const order = doc.data();
       const totalAmount = parseFloat(order.totalAmount) || 0;
       const orderDate = order.createdAt?.toDate ? order.createdAt.toDate() : new Date(order.createdAt);
-      
+
       // Separate product revenue from shipping fees
       const productRevenue = Math.max(0, totalAmount - SHIPPING_FEE);
       const shippingRevenue = totalAmount > 0 ? SHIPPING_FEE : 0;
@@ -59,35 +69,35 @@ export default async function handler(req, res) {
       acc.statusCounts[order.status] = (acc.statusCounts[order.status] || 0) + 1;
 
       // Revenue calculations (product revenue only)
-      acc.totalProductRevenue += productRevenue;
-      acc.totalShippingRevenue += shippingRevenue;
-      acc.totalRevenue += totalAmount; // Keep total for reference
+      acc.totalOnlineProductRevenue += productRevenue;
+      acc.totalOnlineShippingRevenue += shippingRevenue;
+      acc.totalOnlineRevenue += totalAmount;
 
       // Monthly comparisons
       if (orderDate >= startOfCurrentMonth) {
-        acc.currentMonthProductRevenue += productRevenue;
-        acc.currentMonthShippingRevenue += shippingRevenue;
-        acc.currentMonthRevenue += totalAmount;
+        acc.currentMonthOnlineProductRevenue += productRevenue;
+        acc.currentMonthOnlineShippingRevenue += shippingRevenue;
+        acc.currentMonthOnlineRevenue += totalAmount;
         acc.currentMonthOrders++;
       }
 
       if (orderDate >= startOfLastMonth && orderDate <= endOfLastMonth) {
-        acc.lastMonthProductRevenue += productRevenue;
-        acc.lastMonthShippingRevenue += shippingRevenue;
-        acc.lastMonthRevenue += totalAmount;
+        acc.lastMonthOnlineProductRevenue += productRevenue;
+        acc.lastMonthOnlineShippingRevenue += shippingRevenue;
+        acc.lastMonthOnlineRevenue += totalAmount;
         acc.lastMonthOrders++;
       }
 
       // Weekly tracking
       if (orderDate >= oneWeekAgo) {
-        acc.weeklyProductRevenue += productRevenue;
-        acc.weeklyShippingRevenue += shippingRevenue;
-        acc.weeklyRevenue += totalAmount;
+        acc.weeklyOnlineProductRevenue += productRevenue;
+        acc.weeklyOnlineShippingRevenue += shippingRevenue;
+        acc.weeklyOnlineRevenue += totalAmount;
         acc.weeklyOrders++;
       }
 
       // Average order value calculation (total amount)
-      acc.totalOrderValue += totalAmount;
+      acc.totalOnlineOrderValue += totalAmount;
 
       // Popular payment methods
       if (order.paymentMethod) {
@@ -96,43 +106,141 @@ export default async function handler(req, res) {
 
       return acc;
     }, {
-      totalRevenue: 0,
-      totalProductRevenue: 0,
-      totalShippingRevenue: 0,
-      currentMonthRevenue: 0,
-      currentMonthProductRevenue: 0,
-      currentMonthShippingRevenue: 0,
-      lastMonthRevenue: 0,
-      lastMonthProductRevenue: 0,
-      lastMonthShippingRevenue: 0,
-      weeklyRevenue: 0,
-      weeklyProductRevenue: 0,
-      weeklyShippingRevenue: 0,
+      totalOnlineRevenue: 0,
+      totalOnlineProductRevenue: 0,
+      totalOnlineShippingRevenue: 0,
+      currentMonthOnlineRevenue: 0,
+      currentMonthOnlineProductRevenue: 0,
+      currentMonthOnlineShippingRevenue: 0,
+      lastMonthOnlineRevenue: 0,
+      lastMonthOnlineProductRevenue: 0,
+      lastMonthOnlineShippingRevenue: 0,
+      weeklyOnlineRevenue: 0,
+      weeklyOnlineProductRevenue: 0,
+      weeklyOnlineShippingRevenue: 0,
       statusCounts: {},
       currentMonthOrders: 0,
       lastMonthOrders: 0,
       weeklyOrders: 0,
-      totalOrderValue: 0,
+      totalOnlineOrderValue: 0,
       paymentMethods: {}
     });
 
-    // Calculate revenue growth (using product revenue for business metrics)
-    const productRevenueGrowth = orderStats.lastMonthProductRevenue > 0 
-      ? ((orderStats.currentMonthProductRevenue - orderStats.lastMonthProductRevenue) / orderStats.lastMonthProductRevenue * 100).toFixed(1)
-      : orderStats.currentMonthProductRevenue > 0 ? 100 : 0;
+    // Offline Sales Statistics
+    const offlineSalesStats = offlineSalesSnapshot.docs.reduce((acc, doc) => {
+      const sale = doc.data();
+      const totalAmount = parseFloat(sale.totalAmount) || 0;
+      const saleDate = sale.saleDate?.toDate ? sale.saleDate.toDate() : new Date(sale.saleDate);
 
-    const totalRevenueGrowth = orderStats.lastMonthRevenue > 0
-      ? ((orderStats.currentMonthRevenue - orderStats.lastMonthRevenue) / orderStats.lastMonthRevenue * 100).toFixed(1)
-      : orderStats.currentMonthRevenue > 0 ? 100 : 0;
+      // No shipping fee for offline sales
+      acc.totalOfflineProductRevenue += totalAmount;
+      acc.totalOfflineRevenue += totalAmount;
 
-    const ordersGrowth = orderStats.lastMonthOrders > 0
-      ? ((orderStats.currentMonthOrders - orderStats.lastMonthOrders) / orderStats.lastMonthOrders * 100).toFixed(1)
-      : orderStats.currentMonthOrders > 0 ? 100 : 0;
+      // Monthly comparisons
+      if (saleDate >= startOfCurrentMonth) {
+        acc.currentMonthOfflineProductRevenue += totalAmount;
+        acc.currentMonthOfflineRevenue += totalAmount;
+        acc.currentMonthSales++;
+      }
+
+      if (saleDate >= startOfLastMonth && saleDate <= endOfLastMonth) {
+        acc.lastMonthOfflineProductRevenue += totalAmount;
+        acc.lastMonthOfflineRevenue += totalAmount;
+        acc.lastMonthSales++;
+      }
+
+      // Weekly tracking
+      if (saleDate >= oneWeekAgo) {
+        acc.weeklyOfflineProductRevenue += totalAmount;
+        acc.weeklyOfflineRevenue += totalAmount;
+        acc.weeklySales++;
+      }
+
+      // Average sale value
+      acc.totalOfflineSaleValue += totalAmount;
+
+      return acc;
+    }, {
+      totalOfflineRevenue: 0,
+      totalOfflineProductRevenue: 0,
+      currentMonthOfflineRevenue: 0,
+      currentMonthOfflineProductRevenue: 0,
+      lastMonthOfflineRevenue: 0,
+      lastMonthOfflineProductRevenue: 0,
+      weeklyOfflineRevenue: 0,
+      weeklyOfflineProductRevenue: 0,
+      currentMonthSales: 0,
+      lastMonthSales: 0,
+      weeklySales: 0,
+      totalOfflineSaleValue: 0
+    });
+
+    // Spending Statistics
+    const spendingStats = spendingsSnapshot.docs.reduce((acc, doc) => {
+      const spending = doc.data();
+      const amount = parseFloat(spending.amount) || 0;
+      const spendingDate = spending.date?.toDate ? spending.date.toDate() : new Date(spending.date);
+
+      acc.totalExpenses += amount;
+
+      // Monthly comparisons
+      if (spendingDate >= startOfCurrentMonth) {
+        acc.currentMonthExpenses += amount;
+      }
+
+      if (spendingDate >= startOfLastMonth && spendingDate <= endOfLastMonth) {
+        acc.lastMonthExpenses += amount;
+      }
+
+      // Weekly tracking
+      if (spendingDate >= oneWeekAgo) {
+        acc.weeklyExpenses += amount;
+      }
+
+      // Category breakdown
+      if (spending.category) {
+        acc.expenseByCategory[spending.category] = (acc.expenseByCategory[spending.category] || 0) + amount;
+      }
+
+      return acc;
+    }, {
+      totalExpenses: 0,
+      currentMonthExpenses: 0,
+      lastMonthExpenses: 0,
+      weeklyExpenses: 0,
+      expenseByCategory: {}
+    });
+
+    // Calculate growth metrics
+    const totalProductRevenue = orderStats.totalOnlineProductRevenue + offlineSalesStats.totalOfflineProductRevenue;
+    const totalRevenue = orderStats.totalOnlineRevenue + offlineSalesStats.totalOfflineRevenue;
+    const totalShippingRevenue = orderStats.totalOnlineShippingRevenue; // No shipping for offline
+    const productRevenueGrowth = (orderStats.lastMonthOnlineProductRevenue + offlineSalesStats.lastMonthOfflineProductRevenue) > 0
+      ? (((orderStats.currentMonthOnlineProductRevenue + offlineSalesStats.currentMonthOfflineProductRevenue) - 
+          (orderStats.lastMonthOnlineProductRevenue + offlineSalesStats.lastMonthOfflineProductRevenue)) / 
+         (orderStats.lastMonthOnlineProductRevenue + offlineSalesStats.lastMonthOfflineProductRevenue) * 100).toFixed(1)
+      : (orderStats.currentMonthOnlineProductRevenue + offlineSalesStats.currentMonthOfflineProductRevenue) > 0 ? 100 : 0;
+
+    const totalRevenueGrowth = (orderStats.lastMonthOnlineRevenue + offlineSalesStats.lastMonthOfflineRevenue) > 0
+      ? (((orderStats.currentMonthOnlineRevenue + offlineSalesStats.currentMonthOfflineRevenue) - 
+          (orderStats.lastMonthOnlineRevenue + offlineSalesStats.lastMonthOfflineRevenue)) / 
+         (orderStats.lastMonthOnlineRevenue + offlineSalesStats.lastMonthOfflineRevenue) * 100).toFixed(1)
+      : (orderStats.currentMonthOnlineRevenue + offlineSalesStats.currentMonthOfflineRevenue) > 0 ? 100 : 0;
+
+    const ordersGrowth = (orderStats.lastMonthOrders + offlineSalesStats.lastMonthSales) > 0
+      ? (((orderStats.currentMonthOrders + offlineSalesStats.currentMonthSales) - 
+          (orderStats.lastMonthOrders + offlineSalesStats.lastMonthSales)) / 
+         (orderStats.lastMonthOrders + offlineSalesStats.lastMonthSales) * 100).toFixed(1)
+      : (orderStats.currentMonthOrders + offlineSalesStats.currentMonthSales) > 0 ? 100 : 0;
+
+    const expensesGrowth = spendingStats.lastMonthExpenses > 0
+      ? ((spendingStats.currentMonthExpenses - spendingStats.lastMonthExpenses) / spendingStats.lastMonthExpenses * 100).toFixed(1)
+      : spendingStats.currentMonthExpenses > 0 ? 100 : 0;
 
     // Enhanced Product Analytics
     const productAnalytics = productsSnapshot.docs.reduce((acc, doc) => {
       const product = doc.data();
-      
+
       if (!Array.isArray(product.colors)) return acc;
 
       let totalStock = 0;
@@ -153,7 +261,7 @@ export default async function handler(req, res) {
 
           if (quantity === 0) {
             outOfStockSizes[size] = quantity;
-          } else if (quantity <= 5 && quantity > 0) { // Low stock threshold
+          } else if (quantity <= 5 && quantity > 0) {
             lowStockSizes[size] = quantity;
             lowStockItems++;
           }
@@ -174,7 +282,6 @@ export default async function handler(req, res) {
         }
       });
 
-      // Track products by stock status
       if (outOfStockColors.length > 0) {
         acc.outOfStockProducts.push({
           name: product.name,
@@ -193,7 +300,6 @@ export default async function handler(req, res) {
         });
       }
 
-      // Category analytics
       if (product.category) {
         acc.categoryCounts[product.category] = (acc.categoryCounts[product.category] || 0) + 1;
       }
@@ -215,7 +321,6 @@ export default async function handler(req, res) {
       const user = doc.data();
       const createdAt = user.createdAt?.toDate ? user.createdAt.toDate() : new Date(user.createdAt);
 
-      // Monthly growth tracking
       if (createdAt >= oneMonthAgo) {
         acc.newCustomersLastMonth++;
       }
@@ -232,7 +337,6 @@ export default async function handler(req, res) {
         acc.newCustomersLastMonthPrevious++;
       }
 
-      // Location analytics (if available)
       if (user.city || user.governorate) {
         const location = user.governorate || user.city || 'Unknown';
         acc.customersByLocation[location] = (acc.customersByLocation[location] || 0) + 1;
@@ -272,37 +376,49 @@ export default async function handler(req, res) {
     });
 
     // Calculate key performance indicators
-    const averageOrderValue = ordersSnapshot.size > 0 
-      ? (orderStats.totalOrderValue / ordersSnapshot.size).toFixed(2)
+    const totalOrdersAndSales = ordersSnapshot.size + offlineSalesSnapshot.size;
+    const averageOrderValue = totalOrdersAndSales > 0
+      ? ((orderStats.totalOnlineOrderValue + offlineSalesStats.totalOfflineSaleValue) / totalOrdersAndSales).toFixed(2)
       : 0;
 
     const conversionRate = usersSnapshot.size > 0
-      ? ((ordersSnapshot.size / usersSnapshot.size) * 100).toFixed(2)
+      ? ((totalOrdersAndSales / usersSnapshot.size) * 100).toFixed(2)
       : 0;
+
+    const netProfit = totalRevenue - spendingStats.totalExpenses;
 
     // Compile comprehensive stats
     const stats = {
-      // Enhanced order metrics with separated revenues
-      totalOrders: ordersSnapshot.size,
-      totalRevenue: parseFloat(orderStats.totalRevenue.toFixed(2)), // Total including shipping
-      totalProductRevenue: parseFloat(orderStats.totalProductRevenue.toFixed(2)), // Product revenue only
-      totalShippingRevenue: parseFloat(orderStats.totalShippingRevenue.toFixed(2)), // Shipping revenue only
-      currentMonthRevenue: parseFloat(orderStats.currentMonthRevenue.toFixed(2)),
-      currentMonthProductRevenue: parseFloat(orderStats.currentMonthProductRevenue.toFixed(2)),
-      currentMonthShippingRevenue: parseFloat(orderStats.currentMonthShippingRevenue.toFixed(2)),
-      lastMonthRevenue: parseFloat(orderStats.lastMonthRevenue.toFixed(2)),
-      lastMonthProductRevenue: parseFloat(orderStats.lastMonthProductRevenue.toFixed(2)),
-      lastMonthShippingRevenue: parseFloat(orderStats.lastMonthShippingRevenue.toFixed(2)),
-      weeklyRevenue: parseFloat(orderStats.weeklyRevenue.toFixed(2)),
-      weeklyProductRevenue: parseFloat(orderStats.weeklyProductRevenue.toFixed(2)),
-      weeklyShippingRevenue: parseFloat(orderStats.weeklyShippingRevenue.toFixed(2)),
+      // Combined order and offline sales metrics
+      totalOrders: totalOrdersAndSales,
+      totalRevenue: parseFloat(totalRevenue.toFixed(2)),
+      totalProductRevenue: parseFloat(totalProductRevenue.toFixed(2)),
+      totalShippingRevenue: parseFloat(totalShippingRevenue.toFixed(2)),
+      currentMonthRevenue: parseFloat((orderStats.currentMonthOnlineRevenue + offlineSalesStats.currentMonthOfflineRevenue).toFixed(2)),
+      currentMonthProductRevenue: parseFloat((orderStats.currentMonthOnlineProductRevenue + offlineSalesStats.currentMonthOfflineProductRevenue).toFixed(2)),
+      currentMonthShippingRevenue: parseFloat(orderStats.currentMonthOnlineShippingRevenue.toFixed(2)),
+      lastMonthRevenue: parseFloat((orderStats.lastMonthOnlineRevenue + offlineSalesStats.lastMonthOfflineRevenue).toFixed(2)),
+      lastMonthProductRevenue: parseFloat((orderStats.lastMonthOnlineProductRevenue + offlineSalesStats.lastMonthOfflineProductRevenue).toFixed(2)),
+      lastMonthShippingRevenue: parseFloat(orderStats.lastMonthOnlineShippingRevenue.toFixed(2)),
+      weeklyRevenue: parseFloat((orderStats.weeklyOnlineRevenue + offlineSalesStats.weeklyOfflineRevenue).toFixed(2)),
+      weeklyProductRevenue: parseFloat((orderStats.weeklyOnlineProductRevenue + offlineSalesStats.weeklyOfflineProductRevenue).toFixed(2)),
+      weeklyShippingRevenue: parseFloat(orderStats.weeklyOnlineShippingRevenue.toFixed(2)),
       productRevenueGrowth: parseFloat(productRevenueGrowth),
       totalRevenueGrowth: parseFloat(totalRevenueGrowth),
       ordersGrowth: parseFloat(ordersGrowth),
       averageOrderValue: parseFloat(averageOrderValue),
       orderStatusBreakdown: orderStats.statusCounts,
       paymentMethodBreakdown: orderStats.paymentMethods,
-      shippingFee: SHIPPING_FEE, // Include shipping fee for reference
+      shippingFee: SHIPPING_FEE,
+
+      // Spending metrics
+      totalExpenses: parseFloat(spendingStats.totalExpenses.toFixed(2)),
+      currentMonthExpenses: parseFloat(spendingStats.currentMonthExpenses.toFixed(2)),
+      lastMonthExpenses: parseFloat(spendingStats.lastMonthExpenses.toFixed(2)),
+      weeklyExpenses: parseFloat(spendingStats.weeklyExpenses.toFixed(2)),
+      expensesGrowth: parseFloat(expensesGrowth),
+      expenseByCategory: spendingStats.expenseByCategory,
+      netProfit: parseFloat(netProfit.toFixed(2)),
 
       // Enhanced customer metrics
       totalCustomers: usersSnapshot.size,
@@ -326,18 +442,21 @@ export default async function handler(req, res) {
       newSubscribersLastMonth: newsletterStats.newSubscribersLastMonth,
       newSubscribersLastWeek: newsletterStats.newSubscribersLastWeek,
 
-      // Performance indicators with separated revenue metrics
+      // Performance indicators
       kpis: {
-        totalRevenue: parseFloat(orderStats.totalRevenue.toFixed(2)),
-        totalProductRevenue: parseFloat(orderStats.totalProductRevenue.toFixed(2)),
-        totalShippingRevenue: parseFloat(orderStats.totalShippingRevenue.toFixed(2)),
-        totalOrders: ordersSnapshot.size,
+        totalRevenue: parseFloat(totalRevenue.toFixed(2)),
+        totalProductRevenue: parseFloat(totalProductRevenue.toFixed(2)),
+        totalShippingRevenue: parseFloat(totalShippingRevenue.toFixed(2)),
+        totalExpenses: parseFloat(spendingStats.totalExpenses.toFixed(2)),
+        netProfit: parseFloat(netProfit.toFixed(2)),
+        totalOrders: totalOrdersAndSales,
         totalCustomers: usersSnapshot.size,
         averageOrderValue: parseFloat(averageOrderValue),
         conversionRate: parseFloat(conversionRate),
         productRevenueGrowth: parseFloat(productRevenueGrowth),
         totalRevenueGrowth: parseFloat(totalRevenueGrowth),
-        customerGrowth: parseFloat(customerGrowth)
+        customerGrowth: parseFloat(customerGrowth),
+        expensesGrowth: parseFloat(expensesGrowth)
       },
 
       // Data freshness indicator
@@ -346,19 +465,19 @@ export default async function handler(req, res) {
         ordersAvailable: ordersResult.status === 'fulfilled',
         productsAvailable: productsResult.status === 'fulfilled',
         usersAvailable: usersResult.status === 'fulfilled',
-        subscribersAvailable: subscribersResult.status === 'fulfilled'
+        subscribersAvailable: subscribersResult.status === 'fulfilled',
+        offlineSalesAvailable: offlineSalesResult.status === 'fulfilled',
+        spendingsAvailable: spendingsResult.status === 'fulfilled'
       }
     };
 
-    
     res.status(200).json(stats);
   } catch (error) {
     console.error('Error fetching stats:', error);
-    
-    // Return more detailed error information in development
+
     const isDev = process.env.NODE_ENV === 'development';
-    
-    res.status(500).json({ 
+
+    res.status(500).json({
       message: 'Internal server error',
       error: isDev ? error.message : undefined,
       timestamp: new Date().toISOString()
